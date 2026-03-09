@@ -1,0 +1,51 @@
+# =========================
+# Build outputs (Gradle/Java)
+# =========================
+.gradle/
+.gradle-cache/
+build/
+out/
+bin/
+
+# =========================
+# Logs
+# =========================
+*.log
+
+# =========================
+# IDE settings
+# =========================
+.idea/
+*.iml
+.vscode/
+
+# =========================
+# OS files
+# =========================
+.DS_Store
+
+# =========================
+# Environment / sensitive local config
+# =========================
+.env
+.env.*
+application-local.yml
+application-secret.yml
+application-dev.yml
+application-prod.yml
+
+# =========================
+# Local runtime/editor temp files
+# =========================
+hs_err_pid*
+replay_pid*
+*.swp
+*.swo
+
+# =========================
+# Keep Gradle Wrapper tracked
+# =========================
+!gradlew
+!gradlew.bat
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
