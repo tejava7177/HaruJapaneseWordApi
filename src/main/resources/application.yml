@@ -17,3 +17,7 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
+  logging:
+    level:
+      org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping: TRACE

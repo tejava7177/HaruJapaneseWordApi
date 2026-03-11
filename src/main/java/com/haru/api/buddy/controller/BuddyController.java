@@ -1,6 +1,7 @@
 package com.haru.api.buddy.controller;
 
 import com.haru.api.buddy.dto.BuddyResponse;
+import com.haru.api.buddy.dto.ConnectBuddyRequest;
 import com.haru.api.buddy.dto.CreateBuddyRequest;
 import com.haru.api.buddy.service.BuddyService;
 import jakarta.validation.Valid;
@@ -28,5 +29,10 @@ public class BuddyController {
     @PostMapping
     public BuddyResponse addBuddy(@Valid @RequestBody CreateBuddyRequest request) {
         return buddyService.addBuddy(request.userId(), request.buddyUserId());
+    }
+
+    @PostMapping("/connect")
+    public BuddyResponse connectBuddy(@Valid @RequestBody ConnectBuddyRequest request) {
+        return buddyService.connectByBuddyCode(request.userId(), request.buddyCode());
     }
 }

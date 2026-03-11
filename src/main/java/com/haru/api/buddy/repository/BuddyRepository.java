@@ -11,5 +11,7 @@ public interface BuddyRepository extends JpaRepository<Buddy, Long> {
 
     boolean existsByUserIdAndBuddyUserId(Long userId, Long buddyUserId);
 
+    boolean existsByUserIdAndBuddyUserIdAndStatus(Long userId, Long buddyUserId, BuddyStatus status);
+
     List<Buddy> findByUserIdAndStatusOrderByCreatedAtAsc(Long userId, BuddyStatus status);
 }

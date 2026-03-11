@@ -18,7 +18,7 @@ public class UserDataInitializer implements CommandLineRunner {
     @Transactional
     public void run(String... args) {
         if (!userRepository.existsById(1L)) {
-            userRepository.save(new User(1L, "juheun", WordLevel.N4));
+            userRepository.save(new User(1L, "juheun", WordLevel.N4, "JUHEUN01"));
         }
     }
 }

@@ -4,9 +4,9 @@ import com.haru.api.tsuntsun.dto.AnswerTsunTsunRequest;
 import com.haru.api.tsuntsun.dto.SendTsunTsunRequest;
 import com.haru.api.tsuntsun.dto.TsunTsunAnswerResponse;
 import com.haru.api.tsuntsun.dto.TsunTsunQuizResponse;
+import com.haru.api.tsuntsun.dto.TsunTsunTodayResponse;
 import com.haru.api.tsuntsun.service.TsunTsunService;
 import jakarta.validation.Valid;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -33,7 +33,7 @@ public class TsunTsunController {
     }
 
     @GetMapping("/today")
-    public List<TsunTsunQuizResponse> getTodayTsunTsuns(@RequestParam Long userId) {
-        return tsunTsunService.getTodayTsunTsuns(userId);
+    public TsunTsunTodayResponse getTodayTsunTsuns(@RequestParam Long userId, @RequestParam Long buddyId) {
+        return tsunTsunService.getTodayTsunTsuns(userId, buddyId);
     }
 }

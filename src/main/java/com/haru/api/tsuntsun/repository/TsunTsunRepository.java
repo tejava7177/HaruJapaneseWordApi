@@ -7,21 +7,36 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
 public interface TsunTsunRepository extends JpaRepository<TsunTsun, Long> {
 
-    long countBySenderIdAndTargetDate(Long senderId, LocalDate targetDate);
+    long countBySenderIdAndReceiverIdAndTargetDate(Long senderId, Long receiverId, LocalDate targetDate);
 
-    boolean existsBySenderIdAndReceiverIdAndDailyWordItemIdAndTargetDateAndStatus(
+    boolean existsBySenderIdAndReceiverIdAndTargetDateAndStatus(
             Long senderId,
             Long receiverId,
-            Long dailyWordItemId,
             LocalDate targetDate,
             TsunTsunStatus status
     );
 
-    @EntityGraph(attributePaths = {"sender", "receiver", "word"})
-    List<TsunTsun> findByReceiverIdAndTargetDateOrderByCreatedAtDesc(Long receiverId, LocalDate targetDate);
+    boolean existsBySenderIdAndReceiverIdAndDailyWordItemIdAndTargetDate(
+            Long senderId,
+            Long receiverId,
+            Long dailyWordItemId,
+            LocalDate targetDate
+    );
+
+    @EntityGraph(attributePaths = {"sender", "receiver", "word", "dailyWordItem"})
+    @Query("""
+            select t
+            from TsunTsun t
+            where t.targetDate = :targetDate
+              and ((t.sender.id = :userId and t.receiver.id = :buddyId)
+                or (t.sender.id = :buddyId and t.receiver.id = :userId))
+            order by t.createdAt desc
+            """)
+    List<TsunTsun> findPairByTargetDate(Long userId, Long buddyId, LocalDate targetDate);
 
     @EntityGraph(attributePaths = {"word"})
     Optional<TsunTsun> findWithWordById(Long id);

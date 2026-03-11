@@ -9,7 +9,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.haru.api.tsuntsun.domain.TsunTsunStatus;
 import com.haru.api.tsuntsun.dto.QuizChoiceResponse;
 import com.haru.api.tsuntsun.dto.TsunTsunAnswerResponse;
+import com.haru.api.tsuntsun.dto.TsunTsunDirection;
 import com.haru.api.tsuntsun.dto.TsunTsunQuizResponse;
+import com.haru.api.tsuntsun.dto.TsunTsunTodayItemResponse;
+import com.haru.api.tsuntsun.dto.TsunTsunTodayResponse;
+import com.haru.api.tsuntsun.dto.TsunTsunTodayStatus;
 import com.haru.api.tsuntsun.service.TsunTsunService;
 import java.time.LocalDate;
 import java.util.List;
@@ -71,10 +75,22 @@ class TsunTsunControllerTest {
     }
 
     @Test
-    void getToday_returnsList() throws Exception {
-        given(tsunTsunService.getTodayTsunTsuns(2L)).willReturn(List.of());
+    void getToday_returnsPairStatus() throws Exception {
+        TsunTsunTodayResponse response = new TsunTsunTodayResponse(
+                1L,
+                2L,
+                LocalDate.of(2026, 3, 10),
+                3,
+                2,
+                List.of(new TsunTsunTodayItemResponse(101L, 201L, TsunTsunDirection.SENT, TsunTsunTodayStatus.ANSWERED))
+        );
 
-        mockMvc.perform(get("/api/tsuntsun/today").param("userId", "2"))
-                .andExpect(status().isOk());
+        given(tsunTsunService.getTodayTsunTsuns(1L, 2L)).willReturn(response);
+
+        mockMvc.perform(get("/api/tsuntsun/today").param("userId", "1").param("buddyId", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sentCount").value(3))
+                .andExpect(jsonPath("$.receivedCount").value(2))
+                .andExpect(jsonPath("$.items[0].direction").value("SENT"));
     }
 }
