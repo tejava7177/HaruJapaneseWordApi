@@ -329,7 +329,26 @@ public class TsunTsunService {
     }
 
     private long getPairProgressCount(Long userId, Long buddyId, LocalDate targetDate) {
-        return tsunTsunRepository.countPairByTargetDateAndStatus(userId, buddyId, targetDate, TsunTsunStatus.ANSWERED);
+        long leftUserId = Math.min(userId, buddyId);
+        long rightUserId = Math.max(userId, buddyId);
+
+        long leftToRightAnsweredCount = tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDateAndStatus(
+                leftUserId,
+                rightUserId,
+                targetDate,
+                TsunTsunStatus.ANSWERED
+        );
+        long rightToLeftAnsweredCount = tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDateAndStatus(
+                rightUserId,
+                leftUserId,
+                targetDate,
+                TsunTsunStatus.ANSWERED
+        );
+        long progressCount = Math.min(leftToRightAnsweredCount, rightToLeftAnsweredCount);
+
+        log.info("[tsuntsun/progress] pair progress calculated: leftUserId={}, rightUserId={}, leftToRightAnsweredCount={}, rightToLeftAnsweredCount={}, progressCount={}",
+                leftUserId, rightUserId, leftToRightAnsweredCount, rightToLeftAnsweredCount, progressCount);
+        return progressCount;
     }
 
     private void validateBuddyRelation(Long userId, Long buddyId) {

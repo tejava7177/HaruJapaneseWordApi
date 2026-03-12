@@ -183,14 +183,15 @@ class TsunTsunServiceTest {
         TsunTsun tsun = TsunTsun.sent(sender, receiver, word, item, today);
         given(tsunTsunRepository.findWithWordById(1L)).willReturn(Optional.of(tsun));
         given(meaningRepository.findByWordIdOrderByOrdAsc(100L)).willReturn(List.of(correct, wrong));
-        given(tsunTsunRepository.countPairByTargetDateAndStatus(1L, 2L, today, TsunTsunStatus.ANSWERED)).willReturn(1L);
+        given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDateAndStatus(1L, 2L, today, TsunTsunStatus.ANSWERED)).willReturn(1L);
+        given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDateAndStatus(2L, 1L, today, TsunTsunStatus.ANSWERED)).willReturn(0L);
 
         TsunTsunAnswerResponse answer = tsunTsunService.answerTsunTsun(1L, 501L);
         assertThat(answer.correct()).isTrue();
         assertThat(answer.selectedMeaningId()).isEqualTo(501L);
         assertThat(answer.correctMeaningId()).isEqualTo(501L);
         assertThat(answer.correctText()).isEqualTo("정답");
-        assertThat(answer.pairProgressCount()).isEqualTo(1L);
+        assertThat(answer.pairProgressCount()).isEqualTo(0L);
         assertThat(answer.pairProgressGoal()).isEqualTo(10L);
         assertThat(answer.pairCompletedToday()).isFalse();
 
@@ -228,7 +229,8 @@ class TsunTsunServiceTest {
 
         given(tsunTsunRepository.findWithWordById(10L)).willReturn(Optional.of(receivedTsun));
         given(meaningRepository.findByWordIdOrderByOrdAsc(100L)).willReturn(List.of(correct));
-        given(tsunTsunRepository.countPairByTargetDateAndStatus(1L, 2L, today, TsunTsunStatus.ANSWERED)).willReturn(1L);
+        given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDateAndStatus(1L, 2L, today, TsunTsunStatus.ANSWERED)).willReturn(1L);
+        given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDateAndStatus(2L, 1L, today, TsunTsunStatus.ANSWERED)).willReturn(0L);
 
         TsunTsunAnswerResponse answer = tsunTsunService.answerTsunTsun(10L, 501L);
         assertThat(answer.correct()).isTrue();
@@ -278,7 +280,8 @@ class TsunTsunServiceTest {
         given(tsunTsunRepository.findWithWordById(1L)).willReturn(Optional.of(tsun));
         given(meaningRepository.findByWordIdOrderByOrdAsc(100L)).willReturn(List.of(correct));
         given(meaningRepository.findById(502L)).willReturn(Optional.of(wrong));
-        given(tsunTsunRepository.countPairByTargetDateAndStatus(1L, 2L, today, TsunTsunStatus.ANSWERED)).willReturn(4L);
+        given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDateAndStatus(1L, 2L, today, TsunTsunStatus.ANSWERED)).willReturn(4L);
+        given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDateAndStatus(2L, 1L, today, TsunTsunStatus.ANSWERED)).willReturn(1L);
 
         TsunTsunAnswerResponse answer = tsunTsunService.answerTsunTsun(1L, 502L);
 
@@ -287,7 +290,7 @@ class TsunTsunServiceTest {
         assertThat(answer.selectedMeaningId()).isEqualTo(502L);
         assertThat(answer.correctMeaningId()).isEqualTo(501L);
         assertThat(answer.correctText()).isEqualTo("정답");
-        assertThat(answer.pairProgressCount()).isEqualTo(4L);
+        assertThat(answer.pairProgressCount()).isEqualTo(1L);
         assertThat(answer.pairCompletedToday()).isFalse();
         assertThat(tsun.getStatus()).isEqualTo(TsunTsunStatus.ANSWERED);
         verify(tsunTsunAnswerRepository).save(ArgumentMatchers.any());
@@ -310,7 +313,8 @@ class TsunTsunServiceTest {
 
         given(tsunTsunRepository.findWithWordById(1L)).willReturn(Optional.of(tsun));
         given(meaningRepository.findByWordIdOrderByOrdAsc(100L)).willReturn(List.of(correct));
-        given(tsunTsunRepository.countPairByTargetDateAndStatus(1L, 2L, today, TsunTsunStatus.ANSWERED)).willReturn(10L);
+        given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDateAndStatus(1L, 2L, today, TsunTsunStatus.ANSWERED)).willReturn(10L);
+        given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDateAndStatus(2L, 1L, today, TsunTsunStatus.ANSWERED)).willReturn(10L);
 
         TsunTsunAnswerResponse answer = tsunTsunService.answerTsunTsun(1L, -1L);
 
@@ -412,15 +416,141 @@ class TsunTsunServiceTest {
         answered.markAnswered();
         ReflectionTestUtils.setField(answered, "id", 31L);
         given(tsunTsunRepository.findPairByTargetDate(1L, 2L, today)).willReturn(List.of(answered));
-        given(tsunTsunRepository.countPairByTargetDateAndStatus(1L, 2L, today, TsunTsunStatus.ANSWERED)).willReturn(1L);
+        given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDateAndStatus(1L, 2L, today, TsunTsunStatus.ANSWERED)).willReturn(1L);
+        given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDateAndStatus(2L, 1L, today, TsunTsunStatus.ANSWERED)).willReturn(0L);
 
         var response = tsunTsunService.getTodayTsunTsuns(1L, 2L);
 
-        assertThat(response.progressCount()).isEqualTo(1L);
+        assertThat(response.progressCount()).isEqualTo(0L);
         assertThat(response.progressGoal()).isEqualTo(10L);
         assertThat(response.pairCompletedToday()).isFalse();
         assertThat(response.sentCount()).isEqualTo(1L);
         assertThat(response.receivedCount()).isEqualTo(0L);
+    }
+
+    @Test
+    void getTodayTsunTsuns_sendOnlyDoesNotIncreaseProgress() {
+        LocalDate today = LocalDate.now();
+        User user = new User(1L, "u", WordLevel.N4, "AAAA1111");
+        User buddy = new User(2L, "b", WordLevel.N4, "BBBB2222");
+        Word word = new Word("あ", "あ", WordLevel.N4);
+        ReflectionTestUtils.setField(word, "id", 1031L);
+
+        given(userRepository.existsById(1L)).willReturn(true);
+        given(userRepository.existsById(2L)).willReturn(true);
+        given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(1L, 2L, BuddyStatus.ACTIVE)).willReturn(true);
+        given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(2L, 1L, BuddyStatus.ACTIVE)).willReturn(true);
+
+        DailyWordSet buddySet = mock(DailyWordSet.class);
+        DailyWordItem buddyItem = mock(DailyWordItem.class);
+        given(dailyWordSetRepository.findWithItemsByUserIdAndTargetDate(2L, today)).willReturn(Optional.of(buddySet));
+        given(buddySet.getItems()).willReturn(List.of(buddyItem));
+        given(buddyItem.getId()).willReturn(31L);
+        given(buddyItem.getWord()).willReturn(word);
+
+        TsunTsun sentOnly = TsunTsun.sent(user, buddy, word, buddyItem, today);
+        ReflectionTestUtils.setField(sentOnly, "id", 41L);
+        given(tsunTsunRepository.findPairByTargetDate(1L, 2L, today)).willReturn(List.of(sentOnly));
+        given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDateAndStatus(1L, 2L, today, TsunTsunStatus.ANSWERED)).willReturn(0L);
+        given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDateAndStatus(2L, 1L, today, TsunTsunStatus.ANSWERED)).willReturn(0L);
+
+        var response = tsunTsunService.getTodayTsunTsuns(1L, 2L);
+
+        assertThat(response.progressCount()).isEqualTo(0L);
+        assertThat(response.pairCompletedToday()).isFalse();
+        assertThat(response.sentCount()).isEqualTo(1L);
+        assertThat(response.receivedCount()).isEqualTo(0L);
+    }
+
+    @Test
+    void getTodayTsunTsuns_countsRoundTripsUsingMinOfDirectionalAnsweredCounts() {
+        LocalDate today = LocalDate.now();
+        User user = new User(1L, "u", WordLevel.N4, "AAAA1111");
+        User buddy = new User(2L, "b", WordLevel.N4, "BBBB2222");
+
+        given(userRepository.existsById(1L)).willReturn(true);
+        given(userRepository.existsById(2L)).willReturn(true);
+        given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(1L, 2L, BuddyStatus.ACTIVE)).willReturn(true);
+        given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(2L, 1L, BuddyStatus.ACTIVE)).willReturn(true);
+
+        DailyWordSet buddySet = mock(DailyWordSet.class);
+        DailyWordItem buddyItem1 = mock(DailyWordItem.class);
+        DailyWordItem buddyItem2 = mock(DailyWordItem.class);
+        Word word1 = new Word("あ", "あ", WordLevel.N4);
+        Word word2 = new Word("い", "い", WordLevel.N4);
+        ReflectionTestUtils.setField(word1, "id", 1041L);
+        ReflectionTestUtils.setField(word2, "id", 1042L);
+
+        given(dailyWordSetRepository.findWithItemsByUserIdAndTargetDate(2L, today)).willReturn(Optional.of(buddySet));
+        given(buddySet.getItems()).willReturn(List.of(buddyItem1, buddyItem2));
+        given(buddyItem1.getId()).willReturn(41L);
+        given(buddyItem1.getWord()).willReturn(word1);
+        given(buddyItem2.getId()).willReturn(42L);
+        given(buddyItem2.getWord()).willReturn(word2);
+
+        TsunTsun answeredSent = TsunTsun.sent(user, buddy, word1, buddyItem1, today);
+        answeredSent.markAnswered();
+        TsunTsun answeredReceived = TsunTsun.sent(buddy, user, word2, buddyItem2, today);
+        answeredReceived.markAnswered();
+        TsunTsun pendingReceived = TsunTsun.sent(buddy, user, word1, buddyItem1, today);
+
+        given(tsunTsunRepository.findPairByTargetDate(1L, 2L, today))
+                .willReturn(List.of(answeredSent, answeredReceived, pendingReceived));
+        given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDateAndStatus(1L, 2L, today, TsunTsunStatus.ANSWERED)).willReturn(1L);
+        given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDateAndStatus(2L, 1L, today, TsunTsunStatus.ANSWERED)).willReturn(1L);
+
+        var response = tsunTsunService.getTodayTsunTsuns(1L, 2L);
+
+        assertThat(response.progressCount()).isEqualTo(1L);
+        assertThat(response.pairCompletedToday()).isFalse();
+        assertThat(response.sentCount()).isEqualTo(1L);
+        assertThat(response.receivedCount()).isEqualTo(2L);
+    }
+
+    @Test
+    void getTodayTsunTsuns_progressUsesMinimumWhenAnsweredCountsAreUnbalanced() {
+        LocalDate today = LocalDate.now();
+        given(userRepository.existsById(1L)).willReturn(true);
+        given(userRepository.existsById(2L)).willReturn(true);
+        given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(1L, 2L, BuddyStatus.ACTIVE)).willReturn(true);
+        given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(2L, 1L, BuddyStatus.ACTIVE)).willReturn(true);
+
+        DailyWordSet buddySet = mock(DailyWordSet.class);
+        given(dailyWordSetRepository.findWithItemsByUserIdAndTargetDate(2L, today)).willReturn(Optional.of(buddySet));
+        given(buddySet.getItems()).willReturn(List.of());
+        given(tsunTsunRepository.findPairByTargetDate(1L, 2L, today)).willReturn(List.of());
+        given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDateAndStatus(1L, 2L, today, TsunTsunStatus.ANSWERED)).willReturn(2L);
+        given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDateAndStatus(2L, 1L, today, TsunTsunStatus.ANSWERED)).willReturn(1L);
+
+        var response = tsunTsunService.getTodayTsunTsuns(1L, 2L);
+
+        assertThat(response.progressCount()).isEqualTo(1L);
+    }
+
+    @Test
+    void getTodayTsunTsuns_progressIsSameWhenUserOrderIsReversed() {
+        LocalDate today = LocalDate.now();
+        given(userRepository.existsById(1L)).willReturn(true);
+        given(userRepository.existsById(2L)).willReturn(true);
+        given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(1L, 2L, BuddyStatus.ACTIVE)).willReturn(true);
+        given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(2L, 1L, BuddyStatus.ACTIVE)).willReturn(true);
+
+        DailyWordSet user1Set = mock(DailyWordSet.class);
+        DailyWordSet user2Set = mock(DailyWordSet.class);
+        given(dailyWordSetRepository.findWithItemsByUserIdAndTargetDate(2L, today)).willReturn(Optional.of(user2Set));
+        given(dailyWordSetRepository.findWithItemsByUserIdAndTargetDate(1L, today)).willReturn(Optional.of(user1Set));
+        given(user1Set.getItems()).willReturn(List.of());
+        given(user2Set.getItems()).willReturn(List.of());
+        given(tsunTsunRepository.findPairByTargetDate(1L, 2L, today)).willReturn(List.of());
+        given(tsunTsunRepository.findPairByTargetDate(2L, 1L, today)).willReturn(List.of());
+        given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDateAndStatus(1L, 2L, today, TsunTsunStatus.ANSWERED)).willReturn(2L);
+        given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDateAndStatus(2L, 1L, today, TsunTsunStatus.ANSWERED)).willReturn(1L);
+
+        var responseA = tsunTsunService.getTodayTsunTsuns(1L, 2L);
+        var responseB = tsunTsunService.getTodayTsunTsuns(2L, 1L);
+
+        assertThat(responseA.progressCount()).isEqualTo(1L);
+        assertThat(responseB.progressCount()).isEqualTo(1L);
     }
 
     private DailyWordItem mockDailyWordItem(Long id, User receiver, LocalDate targetDate) {

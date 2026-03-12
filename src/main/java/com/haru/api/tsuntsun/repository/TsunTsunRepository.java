@@ -13,6 +13,13 @@ public interface TsunTsunRepository extends JpaRepository<TsunTsun, Long> {
 
     long countBySenderIdAndReceiverIdAndTargetDate(Long senderId, Long receiverId, LocalDate targetDate);
 
+    long countBySenderIdAndReceiverIdAndTargetDateAndStatus(
+            Long senderId,
+            Long receiverId,
+            LocalDate targetDate,
+            TsunTsunStatus status
+    );
+
     boolean existsBySenderIdAndReceiverIdAndTargetDateAndStatus(
             Long senderId,
             Long receiverId,
@@ -37,16 +44,6 @@ public interface TsunTsunRepository extends JpaRepository<TsunTsun, Long> {
             order by t.createdAt desc
             """)
     List<TsunTsun> findPairByTargetDate(Long userId, Long buddyId, LocalDate targetDate);
-
-    @Query("""
-            select count(t)
-            from TsunTsun t
-            where t.targetDate = :targetDate
-              and t.status = :status
-              and ((t.sender.id = :userId and t.receiver.id = :buddyId)
-                or (t.sender.id = :buddyId and t.receiver.id = :userId))
-            """)
-    long countPairByTargetDateAndStatus(Long userId, Long buddyId, LocalDate targetDate, TsunTsunStatus status);
 
     @EntityGraph(attributePaths = {"word"})
     Optional<TsunTsun> findWithWordById(Long id);
