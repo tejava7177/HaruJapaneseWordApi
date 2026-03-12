@@ -42,6 +42,10 @@ public class User {
         this.buddyCode = buddyCode;
     }
 
+    public void changeLearningLevel(WordLevel learningLevel) {
+        this.learningLevel = learningLevel;
+    }
+
     private static String generateBuddyCode() {
         return UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
     }

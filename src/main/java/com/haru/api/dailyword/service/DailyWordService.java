@@ -1,8 +1,12 @@
 package com.haru.api.dailyword.service;
 
 import com.haru.api.dailyword.domain.DailyWordSet;
+import com.haru.api.dailyword.dto.DevDailyWordRegenerateResponse;
 import com.haru.api.dailyword.dto.DailyWordTodayResponse;
 import com.haru.api.dailyword.repository.DailyWordSetRepository;
+import com.haru.api.tsuntsun.domain.TsunTsun;
+import com.haru.api.tsuntsun.repository.TsunTsunAnswerRepository;
+import com.haru.api.tsuntsun.repository.TsunTsunRepository;
 import com.haru.api.user.domain.User;
 import com.haru.api.user.repository.UserRepository;
 import com.haru.api.word.domain.Word;
@@ -28,6 +32,8 @@ public class DailyWordService {
     private final UserRepository userRepository;
     private final WordRepository wordRepository;
     private final DailyWordSetRepository dailyWordSetRepository;
+    private final TsunTsunRepository tsunTsunRepository;
+    private final TsunTsunAnswerRepository tsunTsunAnswerRepository;
 
     @Transactional
     public DailyWordTodayResponse getTodayWords(Long userId) {
@@ -39,6 +45,41 @@ public class DailyWordService {
         return dailyWordSetRepository.findWithItemsByUserIdAndTargetDate(userId, today)
                 .map(DailyWordTodayResponse::from)
                 .orElseGet(() -> createTodayWords(user, today));
+    }
+
+    @Transactional
+    public DevDailyWordRegenerateResponse regenerateTodayWordsForDevelopment(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId));
+
+        LocalDate today = LocalDate.now();
+        dailyWordSetRepository.findByUserIdAndTargetDate(userId, today)
+                .ifPresent(existingSet -> {
+                    List<Long> dailyWordItemIds = existingSet.getItems().stream()
+                            .map(item -> item.getId())
+                            .toList();
+
+                    if (!dailyWordItemIds.isEmpty()) {
+                        List<Long> tsuntsunIds = tsunTsunRepository.findByDailyWordItemIdInAndTargetDate(dailyWordItemIds, today)
+                                .stream()
+                                .map(TsunTsun::getId)
+                                .toList();
+
+                        if (!tsuntsunIds.isEmpty()) {
+                            tsunTsunAnswerRepository.deleteByTsuntsunIdIn(tsuntsunIds);
+                            tsunTsunAnswerRepository.flush();
+                        }
+
+                        tsunTsunRepository.deleteByDailyWordItemIdInAndTargetDate(dailyWordItemIds, today);
+                        tsunTsunRepository.flush();
+                    }
+
+                    dailyWordSetRepository.delete(existingSet);
+                    dailyWordSetRepository.flush();
+                });
+
+        DailyWordTodayResponse regenerated = createTodayWords(user, today);
+        return DevDailyWordRegenerateResponse.from(regenerated);
     }
 
     private DailyWordTodayResponse createTodayWords(User user, LocalDate targetDate) {
