@@ -32,7 +32,7 @@ class DailyWordControllerTest {
                 1L,
                 LocalDate.of(2026, 3, 9),
                 WordLevel.N4,
-                List.of(new DailyWordItemResponse(1L, "ああ", "ああ", WordLevel.N4, 1))
+                List.of(new DailyWordItemResponse(41L, 1L, "ああ", "ああ", WordLevel.N4, 1))
         );
 
         given(dailyWordService.getTodayWords(1L)).willReturn(response);
@@ -42,6 +42,7 @@ class DailyWordControllerTest {
                 .andExpect(jsonPath("$.userId").value(1))
                 .andExpect(jsonPath("$.targetDate").value("2026-03-09"))
                 .andExpect(jsonPath("$.level").value("N4"))
+                .andExpect(jsonPath("$.items[0].dailyWordItemId").value(41))
                 .andExpect(jsonPath("$.items[0].wordId").value(1))
                 .andExpect(jsonPath("$.items[0].orderIndex").value(1));
     }
