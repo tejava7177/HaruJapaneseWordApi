@@ -5,9 +5,10 @@ import com.haru.api.tsuntsun.domain.TsunTsunStatus;
 public record TsunTsunAnswerResponse(
         Long tsuntsunId,
         boolean correct,
-        String selectedMeaning,
+        Long selectedMeaningId,
+        String selectedText,
         Long correctMeaningId,
-        String correctMeaning,
+        String correctText,
         TsunTsunStatus status
 ) {
 }

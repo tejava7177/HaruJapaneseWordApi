@@ -3,6 +3,7 @@ package com.haru.api.tsuntsun.controller;
 import com.haru.api.tsuntsun.dto.AnswerTsunTsunRequest;
 import com.haru.api.tsuntsun.dto.SendTsunTsunRequest;
 import com.haru.api.tsuntsun.dto.TsunTsunAnswerResponse;
+import com.haru.api.tsuntsun.dto.TsunTsunInboxResponse;
 import com.haru.api.tsuntsun.dto.TsunTsunQuizResponse;
 import com.haru.api.tsuntsun.dto.TsunTsunTodayResponse;
 import com.haru.api.tsuntsun.service.TsunTsunService;
@@ -30,6 +31,11 @@ public class TsunTsunController {
     @PostMapping("/answer")
     public TsunTsunAnswerResponse answerTsunTsun(@Valid @RequestBody AnswerTsunTsunRequest request) {
         return tsunTsunService.answerTsunTsun(request.tsuntsunId(), request.meaningId());
+    }
+
+    @GetMapping("/inbox")
+    public TsunTsunInboxResponse getInbox(@RequestParam Long userId) {
+        return tsunTsunService.getInbox(userId);
     }
 
     @GetMapping("/today")

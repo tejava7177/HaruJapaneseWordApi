@@ -10,6 +10,8 @@ import com.haru.api.tsuntsun.domain.TsunTsunStatus;
 import com.haru.api.tsuntsun.dto.QuizChoiceResponse;
 import com.haru.api.tsuntsun.dto.TsunTsunAnswerResponse;
 import com.haru.api.tsuntsun.dto.TsunTsunDirection;
+import com.haru.api.tsuntsun.dto.TsunTsunInboxItemResponse;
+import com.haru.api.tsuntsun.dto.TsunTsunInboxResponse;
 import com.haru.api.tsuntsun.dto.TsunTsunQuizResponse;
 import com.haru.api.tsuntsun.dto.TsunTsunTodayItemResponse;
 import com.haru.api.tsuntsun.dto.TsunTsunTodayResponse;
@@ -61,7 +63,7 @@ class TsunTsunControllerTest {
 
     @Test
     void answerTsunTsun_returnsAnswerResult() throws Exception {
-        TsunTsunAnswerResponse response = new TsunTsunAnswerResponse(1L, true, "인사", 100L, "인사", TsunTsunStatus.ANSWERED);
+        TsunTsunAnswerResponse response = new TsunTsunAnswerResponse(1L, true, 100L, "인사", 100L, "인사", TsunTsunStatus.ANSWERED);
         given(tsunTsunService.answerTsunTsun(1L, 100L)).willReturn(response);
 
         mockMvc.perform(post("/api/tsuntsun/answer")
@@ -71,7 +73,35 @@ class TsunTsunControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.correct").value(true))
+                .andExpect(jsonPath("$.selectedMeaningId").value(100))
+                .andExpect(jsonPath("$.correctText").value("인사"))
                 .andExpect(jsonPath("$.status").value("ANSWERED"));
+    }
+
+    @Test
+    void getInbox_returnsUnansweredItems() throws Exception {
+        TsunTsunInboxResponse response = new TsunTsunInboxResponse(
+                2L,
+                1,
+                List.of(new TsunTsunInboxItemResponse(
+                        11L,
+                        1L,
+                        "김민성",
+                        390L,
+                        "紹介",
+                        "しょうかい",
+                        LocalDate.of(2026, 3, 12),
+                        List.of(new QuizChoiceResponse(100L, "소개"), new QuizChoiceResponse(-1L, "모르겠어요"))
+                ))
+        );
+        given(tsunTsunService.getInbox(2L)).willReturn(response);
+
+        mockMvc.perform(get("/api/tsuntsun/inbox").param("userId", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(2))
+                .andExpect(jsonPath("$.unansweredCount").value(1))
+                .andExpect(jsonPath("$.items[0].senderName").value("김민성"))
+                .andExpect(jsonPath("$.items[0].choices[0].meaningId").value(100));
     }
 
     @Test

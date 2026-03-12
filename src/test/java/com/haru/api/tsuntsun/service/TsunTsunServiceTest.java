@@ -16,6 +16,7 @@ import com.haru.api.tsuntsun.domain.TsunTsun;
 import com.haru.api.tsuntsun.domain.TsunTsunStatus;
 import com.haru.api.tsuntsun.dto.QuizChoiceResponse;
 import com.haru.api.tsuntsun.dto.TsunTsunAnswerResponse;
+import com.haru.api.tsuntsun.dto.TsunTsunInboxResponse;
 import com.haru.api.tsuntsun.dto.TsunTsunQuizResponse;
 import com.haru.api.tsuntsun.repository.TsunTsunAnswerRepository;
 import com.haru.api.tsuntsun.repository.TsunTsunRepository;
@@ -163,6 +164,8 @@ class TsunTsunServiceTest {
 
         TsunTsunAnswerResponse answer = tsunTsunService.answerTsunTsun(1L, 501L);
         assertThat(answer.correct()).isTrue();
+        assertThat(answer.selectedMeaningId()).isEqualTo(501L);
+        assertThat(answer.correctText()).isEqualTo("정답");
         assertThat(answer.status()).isEqualTo(TsunTsunStatus.ANSWERED);
 
         given(userRepository.findById(1L)).willReturn(Optional.of(sender));
@@ -192,6 +195,41 @@ class TsunTsunServiceTest {
         assertThatThrownBy(() -> tsunTsunService.getTodayTsunTsuns(4L, 3L))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("Buddy relationship not found between userId=4 and buddyId=3");
+    }
+
+    @Test
+    void getInbox_returnsTodayUnansweredTsunsForReceiver() {
+        LocalDate today = LocalDate.now();
+        User sender = new User(1L, "김민성", WordLevel.N4, "AAAA1111");
+        User receiver = new User(2L, "buddy2", WordLevel.N4, "BBBB2222");
+        Word word = new Word("紹介", "しょうかい", WordLevel.N4);
+        ReflectionTestUtils.setField(word, "id", 390L);
+
+        DailyWordItem item = mock(DailyWordItem.class);
+        given(userRepository.existsById(2L)).willReturn(true);
+
+        TsunTsun tsunTsun = TsunTsun.sent(sender, receiver, word, item, today);
+        ReflectionTestUtils.setField(tsunTsun, "id", 11L);
+        given(tsunTsunRepository.findByReceiverIdAndTargetDateAndStatusOrderByCreatedAtDesc(2L, today, TsunTsunStatus.SENT))
+                .willReturn(List.of(tsunTsun));
+        given(tsunTsunQuizService.generateChoices(word))
+                .willReturn(List.of(new QuizChoiceResponse(100L, "소개"), new QuizChoiceResponse(-1L, "모르겠어요")));
+
+        TsunTsunInboxResponse response = tsunTsunService.getInbox(2L);
+
+        assertThat(response.userId()).isEqualTo(2L);
+        assertThat(response.unansweredCount()).isEqualTo(1);
+        assertThat(response.items().get(0).senderName()).isEqualTo("김민성");
+        assertThat(response.items().get(0).choices()).hasSize(2);
+    }
+
+    @Test
+    void getInbox_failsWhenUserMissing() {
+        given(userRepository.existsById(999L)).willReturn(false);
+
+        assertThatThrownBy(() -> tsunTsunService.getInbox(999L))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("User not found: 999");
     }
 
     private DailyWordItem mockDailyWordItem(Long id, User receiver, LocalDate targetDate) {

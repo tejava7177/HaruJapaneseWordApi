@@ -41,6 +41,13 @@ public interface TsunTsunRepository extends JpaRepository<TsunTsun, Long> {
     @EntityGraph(attributePaths = {"word"})
     Optional<TsunTsun> findWithWordById(Long id);
 
+    @EntityGraph(attributePaths = {"sender", "word"})
+    List<TsunTsun> findByReceiverIdAndTargetDateAndStatusOrderByCreatedAtDesc(
+            Long receiverId,
+            LocalDate targetDate,
+            TsunTsunStatus status
+    );
+
     List<TsunTsun> findByDailyWordItemIdInAndTargetDate(List<Long> dailyWordItemIds, LocalDate targetDate);
 
     void deleteByDailyWordItemIdInAndTargetDate(List<Long> dailyWordItemIds, LocalDate targetDate);

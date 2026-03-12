@@ -13,6 +13,8 @@ import com.haru.api.tsuntsun.domain.TsunTsunStatus;
 import com.haru.api.tsuntsun.dto.QuizChoiceResponse;
 import com.haru.api.tsuntsun.dto.TsunTsunAnswerResponse;
 import com.haru.api.tsuntsun.dto.TsunTsunDirection;
+import com.haru.api.tsuntsun.dto.TsunTsunInboxItemResponse;
+import com.haru.api.tsuntsun.dto.TsunTsunInboxResponse;
 import com.haru.api.tsuntsun.dto.TsunTsunQuizResponse;
 import com.haru.api.tsuntsun.dto.TsunTsunTodayItemResponse;
 import com.haru.api.tsuntsun.dto.TsunTsunTodayResponse;
@@ -150,11 +152,31 @@ public class TsunTsunService {
         return new TsunTsunAnswerResponse(
                 tsuntsunId,
                 isCorrect,
+                meaningId,
                 selectedMeaningText,
                 correctMeaning.getId(),
                 correctMeaning.getText(),
                 tsunTsun.getStatus()
         );
+    }
+
+    @Transactional(readOnly = true)
+    public TsunTsunInboxResponse getInbox(Long userId) {
+        if (!userRepository.existsById(userId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId);
+        }
+
+        LocalDate today = LocalDate.now();
+        List<TsunTsunInboxItemResponse> items = tsunTsunRepository
+                .findByReceiverIdAndTargetDateAndStatusOrderByCreatedAtDesc(userId, today, TsunTsunStatus.SENT)
+                .stream()
+                .map(tsunTsun -> TsunTsunInboxItemResponse.from(
+                        tsunTsun,
+                        tsunTsunQuizService.generateChoices(tsunTsun.getWord())
+                ))
+                .toList();
+
+        return new TsunTsunInboxResponse(userId, items.size(), items);
     }
 
     @Transactional(readOnly = true)
