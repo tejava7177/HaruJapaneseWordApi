@@ -29,11 +29,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class TsunTsunService {
@@ -157,77 +159,97 @@ public class TsunTsunService {
 
     @Transactional(readOnly = true)
     public TsunTsunTodayResponse getTodayTsunTsuns(Long userId, Long buddyId) {
-        if (!userRepository.existsById(userId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId);
-        }
-        if (!userRepository.existsById(buddyId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + buddyId);
-        }
-        validateBuddyRelation(userId, buddyId);
+        log.info("[tsuntsun/today] request received: userId={}, buddyId={}", userId, buddyId);
 
-        LocalDate today = LocalDate.now();
+        try {
+            if (!userRepository.existsById(userId)) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId);
+            }
+            if (!userRepository.existsById(buddyId)) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + buddyId);
+            }
 
-        DailyWordSet buddySet = dailyWordSetRepository.findWithItemsByUserIdAndTargetDate(buddyId, today)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Buddy daily words not found for today"));
+            boolean connected = hasActiveBuddyRelation(userId, buddyId);
+            log.info("[tsuntsun/today] buddy relation check: userId={}, buddyId={}, connected={}", userId, buddyId, connected);
+            if (!connected) {
+                throw missingBuddyRelation(userId, buddyId);
+            }
 
-        List<TsunTsun> pairTsuns = tsunTsunRepository.findPairByTargetDate(userId, buddyId, today);
+            LocalDate today = LocalDate.now();
+            DailyWordSet buddySet = dailyWordSetRepository.findWithItemsByUserIdAndTargetDate(buddyId, today)
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.NOT_FOUND,
+                            "Buddy daily words not found for buddyId=" + buddyId + " on targetDate=" + today
+                    ));
+            log.info("[tsuntsun/today] buddy daily words found: buddyId={}, targetDate={}, itemCount={}",
+                    buddyId, today, buddySet.getItems().size());
 
-        long sentCount = pairTsuns.stream()
-                .filter(t -> t.getSender().getId().equals(userId) && t.getReceiver().getId().equals(buddyId))
-                .count();
+            List<TsunTsun> pairTsuns = tsunTsunRepository.findPairByTargetDate(userId, buddyId, today);
 
-        long receivedCount = pairTsuns.stream()
-                .filter(t -> t.getSender().getId().equals(buddyId) && t.getReceiver().getId().equals(userId))
-                .count();
+            long sentCount = pairTsuns.stream()
+                    .filter(t -> t.getSender().getId().equals(userId) && t.getReceiver().getId().equals(buddyId))
+                    .count();
 
-        Map<Long, TsunTsun> sentByItem = pairTsuns.stream()
-                .filter(t -> t.getSender().getId().equals(userId) && t.getReceiver().getId().equals(buddyId))
-                .collect(java.util.stream.Collectors.toMap(
-                        t -> t.getDailyWordItem().getId(),
-                        Function.identity(),
-                        (oldValue, newValue) -> oldValue
-                ));
+            long receivedCount = pairTsuns.stream()
+                    .filter(t -> t.getSender().getId().equals(buddyId) && t.getReceiver().getId().equals(userId))
+                    .count();
 
-        Map<Long, TsunTsun> receivedByItem = pairTsuns.stream()
-                .filter(t -> t.getSender().getId().equals(buddyId) && t.getReceiver().getId().equals(userId))
-                .collect(java.util.stream.Collectors.toMap(
-                        t -> t.getDailyWordItem().getId(),
-                        Function.identity(),
-                        (oldValue, newValue) -> oldValue
-                ));
+            Map<Long, TsunTsun> sentByItem = pairTsuns.stream()
+                    .filter(t -> t.getSender().getId().equals(userId) && t.getReceiver().getId().equals(buddyId))
+                    .collect(java.util.stream.Collectors.toMap(
+                            t -> t.getDailyWordItem().getId(),
+                            Function.identity(),
+                            (oldValue, newValue) -> oldValue
+                    ));
 
-        List<TsunTsunTodayItemResponse> items = buddySet.getItems().stream()
-                .map(item -> {
-                    TsunTsun sent = sentByItem.get(item.getId());
-                    if (sent != null) {
+            Map<Long, TsunTsun> receivedByItem = pairTsuns.stream()
+                    .filter(t -> t.getSender().getId().equals(buddyId) && t.getReceiver().getId().equals(userId))
+                    .collect(java.util.stream.Collectors.toMap(
+                            t -> t.getDailyWordItem().getId(),
+                            Function.identity(),
+                            (oldValue, newValue) -> oldValue
+                    ));
+
+            List<TsunTsunTodayItemResponse> items = buddySet.getItems().stream()
+                    .map(item -> {
+                        TsunTsun sent = sentByItem.get(item.getId());
+                        if (sent != null) {
+                            return new TsunTsunTodayItemResponse(
+                                    item.getId(),
+                                    item.getWord().getId(),
+                                    TsunTsunDirection.SENT,
+                                    toTodayStatus(sent.getStatus())
+                            );
+                        }
+
+                        TsunTsun received = receivedByItem.get(item.getId());
+                        if (received != null) {
+                            return new TsunTsunTodayItemResponse(
+                                    item.getId(),
+                                    item.getWord().getId(),
+                                    TsunTsunDirection.RECEIVED,
+                                    toTodayStatus(received.getStatus())
+                            );
+                        }
+
                         return new TsunTsunTodayItemResponse(
                                 item.getId(),
                                 item.getWord().getId(),
-                                TsunTsunDirection.SENT,
-                                toTodayStatus(sent.getStatus())
+                                TsunTsunDirection.NONE,
+                                TsunTsunTodayStatus.NONE
                         );
-                    }
+                    })
+                    .toList();
 
-                    TsunTsun received = receivedByItem.get(item.getId());
-                    if (received != null) {
-                        return new TsunTsunTodayItemResponse(
-                                item.getId(),
-                                item.getWord().getId(),
-                                TsunTsunDirection.RECEIVED,
-                                toTodayStatus(received.getStatus())
-                        );
-                    }
-
-                    return new TsunTsunTodayItemResponse(
-                            item.getId(),
-                            item.getWord().getId(),
-                            TsunTsunDirection.NONE,
-                            TsunTsunTodayStatus.NONE
-                    );
-                })
-                .toList();
-
-        return new TsunTsunTodayResponse(userId, buddyId, today, sentCount, receivedCount, items);
+            TsunTsunTodayResponse response = new TsunTsunTodayResponse(userId, buddyId, today, sentCount, receivedCount, items);
+            log.info("[tsuntsun/today] response ready: userId={}, buddyId={}, sentCount={}, receivedCount={}, itemCount={}",
+                    userId, buddyId, sentCount, receivedCount, items.size());
+            return response;
+        } catch (ResponseStatusException ex) {
+            log.warn("[tsuntsun/today] request failed: userId={}, buddyId={}, status={}, reason={}",
+                    userId, buddyId, ex.getStatusCode(), ex.getReason());
+            throw ex;
+        }
     }
 
     private TsunTsunTodayStatus toTodayStatus(TsunTsunStatus status) {
@@ -238,11 +260,20 @@ public class TsunTsunService {
     }
 
     private void validateBuddyRelation(Long userId, Long buddyId) {
-        boolean connected = buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(userId, buddyId, BuddyStatus.ACTIVE)
-                && buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(buddyId, userId, BuddyStatus.ACTIVE);
-
-        if (!connected) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "버디로 연결된 사용자에게만 츤츤을 보낼 수 있습니다.");
+        if (!hasActiveBuddyRelation(userId, buddyId)) {
+            throw missingBuddyRelation(userId, buddyId);
         }
+    }
+
+    private boolean hasActiveBuddyRelation(Long userId, Long buddyId) {
+        return buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(userId, buddyId, BuddyStatus.ACTIVE)
+                && buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(buddyId, userId, BuddyStatus.ACTIVE);
+    }
+
+    private ResponseStatusException missingBuddyRelation(Long userId, Long buddyId) {
+        return new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Buddy relationship not found between userId=" + userId + " and buddyId=" + buddyId
+        );
     }
 }

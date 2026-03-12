@@ -183,6 +183,17 @@ class TsunTsunServiceTest {
         assertThat(next.tsuntsunId()).isEqualTo(88L);
     }
 
+    @Test
+    void getTodayTsunTsuns_failsWithClearMessageWhenBuddyRelationMissing() {
+        given(userRepository.existsById(4L)).willReturn(true);
+        given(userRepository.existsById(3L)).willReturn(true);
+        given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(4L, 3L, BuddyStatus.ACTIVE)).willReturn(false);
+
+        assertThatThrownBy(() -> tsunTsunService.getTodayTsunTsuns(4L, 3L))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Buddy relationship not found between userId=4 and buddyId=3");
+    }
+
     private DailyWordItem mockDailyWordItem(Long id, User receiver, LocalDate targetDate) {
         DailyWordItem item = mock(DailyWordItem.class);
         DailyWordSet set = mock(DailyWordSet.class);
