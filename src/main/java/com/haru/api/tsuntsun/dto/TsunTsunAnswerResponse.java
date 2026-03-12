@@ -5,6 +5,9 @@ public record TsunTsunAnswerResponse(
         boolean correct,
         Long selectedMeaningId,
         Long correctMeaningId,
-        String correctText
+        String correctText,
+        long pairProgressCount,
+        long pairProgressGoal,
+        boolean pairCompletedToday
 ) {
 }

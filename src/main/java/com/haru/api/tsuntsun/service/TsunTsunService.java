@@ -43,6 +43,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class TsunTsunService {
 
     private static final int DAILY_SEND_LIMIT_PER_BUDDY = 10;
+    private static final int PAIR_PROGRESS_GOAL = DAILY_SEND_LIMIT_PER_BUDDY;
     private static final long GIVE_UP_CHOICE_ID = -1L;
     private static final String GIVE_UP_TEXT = "모르겠어요";
     private static final String UNKNOWN_MEANING_TEXT = "알 수 없는 뜻";
@@ -157,13 +158,30 @@ public class TsunTsunService {
 
         tsunTsun.markAnswered();
         tsunTsunAnswerRepository.save(TsunTsunAnswer.of(tsunTsun, selectedMeaningText, isCorrect));
+        long pairProgressCount = getPairProgressCount(
+                tsunTsun.getSender().getId(),
+                tsunTsun.getReceiver().getId(),
+                tsunTsun.getTargetDate()
+        );
+        boolean pairCompletedToday = pairProgressCount >= PAIR_PROGRESS_GOAL;
+
+        if (pairCompletedToday) {
+            log.info("[TsunTsun] pair completed today userId={} buddyId={} progress={}/{}",
+                    tsunTsun.getSender().getId(),
+                    tsunTsun.getReceiver().getId(),
+                    pairProgressCount,
+                    PAIR_PROGRESS_GOAL);
+        }
 
         return new TsunTsunAnswerResponse(
                 tsuntsunId,
                 isCorrect,
                 meaningId,
                 correctMeaning.getId(),
-                correctMeaning.getText()
+                correctMeaning.getText(),
+                pairProgressCount,
+                PAIR_PROGRESS_GOAL,
+                pairCompletedToday
         );
     }
 
@@ -232,6 +250,8 @@ public class TsunTsunService {
             long receivedCount = pairTsuns.stream()
                     .filter(t -> t.getSender().getId().equals(buddyId) && t.getReceiver().getId().equals(userId))
                     .count();
+            long progressCount = getPairProgressCount(userId, buddyId, today);
+            boolean pairCompletedToday = progressCount >= PAIR_PROGRESS_GOAL;
 
             Map<Long, TsunTsun> sentByItem = pairTsuns.stream()
                     .filter(t -> t.getSender().getId().equals(userId) && t.getReceiver().getId().equals(buddyId))
@@ -280,9 +300,19 @@ public class TsunTsunService {
                     })
                     .toList();
 
-            TsunTsunTodayResponse response = new TsunTsunTodayResponse(userId, buddyId, today, sentCount, receivedCount, items);
-            log.info("[tsuntsun/today] response ready: userId={}, buddyId={}, sentCount={}, receivedCount={}, itemCount={}",
-                    userId, buddyId, sentCount, receivedCount, items.size());
+            TsunTsunTodayResponse response = new TsunTsunTodayResponse(
+                    userId,
+                    buddyId,
+                    today,
+                    progressCount,
+                    PAIR_PROGRESS_GOAL,
+                    sentCount,
+                    receivedCount,
+                    pairCompletedToday,
+                    items
+            );
+            log.info("[tsuntsun/today] response ready: userId={}, buddyId={}, progressCount={}, progressGoal={}, sentCount={}, receivedCount={}, pairCompletedToday={}, itemCount={}",
+                    userId, buddyId, progressCount, PAIR_PROGRESS_GOAL, sentCount, receivedCount, pairCompletedToday, items.size());
             return response;
         } catch (ResponseStatusException ex) {
             log.warn("[tsuntsun/today] request failed: userId={}, buddyId={}, status={}, reason={}",
@@ -296,6 +326,10 @@ public class TsunTsunService {
             case SENT -> TsunTsunTodayStatus.SENT;
             case ANSWERED -> TsunTsunTodayStatus.ANSWERED;
         };
+    }
+
+    private long getPairProgressCount(Long userId, Long buddyId, LocalDate targetDate) {
+        return tsunTsunRepository.countPairByTargetDateAndStatus(userId, buddyId, targetDate, TsunTsunStatus.ANSWERED);
     }
 
     private void validateBuddyRelation(Long userId, Long buddyId) {

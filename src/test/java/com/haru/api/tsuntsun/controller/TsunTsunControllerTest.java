@@ -64,7 +64,7 @@ class TsunTsunControllerTest {
 
     @Test
     void answerTsunTsun_returnsAnswerResult() throws Exception {
-        TsunTsunAnswerResponse response = new TsunTsunAnswerResponse(1L, true, 100L, 100L, "인사");
+        TsunTsunAnswerResponse response = new TsunTsunAnswerResponse(1L, true, 100L, 100L, "인사", 3L, 10L, false);
         given(tsunTsunService.answerTsunTsun(1L, 100L)).willReturn(response);
 
         mockMvc.perform(post("/api/tsuntsun/answer")
@@ -76,12 +76,15 @@ class TsunTsunControllerTest {
                 .andExpect(jsonPath("$.correct").value(true))
                 .andExpect(jsonPath("$.selectedMeaningId").value(100))
                 .andExpect(jsonPath("$.correctMeaningId").value(100))
-                .andExpect(jsonPath("$.correctText").value("인사"));
+                .andExpect(jsonPath("$.correctText").value("인사"))
+                .andExpect(jsonPath("$.pairProgressCount").value(3))
+                .andExpect(jsonPath("$.pairProgressGoal").value(10))
+                .andExpect(jsonPath("$.pairCompletedToday").value(false));
     }
 
     @Test
     void answerTsunTsun_returnsWrongResultWithOkStatus() throws Exception {
-        TsunTsunAnswerResponse response = new TsunTsunAnswerResponse(11L, false, 3222L, 100L, "보통");
+        TsunTsunAnswerResponse response = new TsunTsunAnswerResponse(11L, false, 3222L, 100L, "보통", 10L, 10L, true);
         given(tsunTsunService.answerTsunTsun(11L, 3222L)).willReturn(response);
 
         mockMvc.perform(post("/api/tsuntsun/answer")
@@ -94,7 +97,10 @@ class TsunTsunControllerTest {
                 .andExpect(jsonPath("$.correct").value(false))
                 .andExpect(jsonPath("$.selectedMeaningId").value(3222))
                 .andExpect(jsonPath("$.correctMeaningId").value(100))
-                .andExpect(jsonPath("$.correctText").value("보통"));
+                .andExpect(jsonPath("$.correctText").value("보통"))
+                .andExpect(jsonPath("$.pairProgressCount").value(10))
+                .andExpect(jsonPath("$.pairProgressGoal").value(10))
+                .andExpect(jsonPath("$.pairCompletedToday").value(true));
     }
 
     @Test
@@ -142,8 +148,11 @@ class TsunTsunControllerTest {
                 1L,
                 2L,
                 LocalDate.of(2026, 3, 10),
+                9,
+                10,
                 3,
                 2,
+                false,
                 List.of(new TsunTsunTodayItemResponse(101L, 201L, TsunTsunDirection.SENT, TsunTsunTodayStatus.ANSWERED))
         );
 
@@ -151,8 +160,11 @@ class TsunTsunControllerTest {
 
         mockMvc.perform(get("/api/tsuntsun/today").param("userId", "1").param("buddyId", "2"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.progressCount").value(9))
+                .andExpect(jsonPath("$.progressGoal").value(10))
                 .andExpect(jsonPath("$.sentCount").value(3))
                 .andExpect(jsonPath("$.receivedCount").value(2))
+                .andExpect(jsonPath("$.pairCompletedToday").value(false))
                 .andExpect(jsonPath("$.items[0].direction").value("SENT"));
     }
 }

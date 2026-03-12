@@ -183,12 +183,16 @@ class TsunTsunServiceTest {
         TsunTsun tsun = TsunTsun.sent(sender, receiver, word, item, today);
         given(tsunTsunRepository.findWithWordById(1L)).willReturn(Optional.of(tsun));
         given(meaningRepository.findByWordIdOrderByOrdAsc(100L)).willReturn(List.of(correct, wrong));
+        given(tsunTsunRepository.countPairByTargetDateAndStatus(1L, 2L, today, TsunTsunStatus.ANSWERED)).willReturn(1L);
 
         TsunTsunAnswerResponse answer = tsunTsunService.answerTsunTsun(1L, 501L);
         assertThat(answer.correct()).isTrue();
         assertThat(answer.selectedMeaningId()).isEqualTo(501L);
         assertThat(answer.correctMeaningId()).isEqualTo(501L);
         assertThat(answer.correctText()).isEqualTo("정답");
+        assertThat(answer.pairProgressCount()).isEqualTo(1L);
+        assertThat(answer.pairProgressGoal()).isEqualTo(10L);
+        assertThat(answer.pairCompletedToday()).isFalse();
 
         given(userRepository.findById(1L)).willReturn(Optional.of(sender));
         given(userRepository.findById(2L)).willReturn(Optional.of(receiver));
@@ -224,6 +228,7 @@ class TsunTsunServiceTest {
 
         given(tsunTsunRepository.findWithWordById(10L)).willReturn(Optional.of(receivedTsun));
         given(meaningRepository.findByWordIdOrderByOrdAsc(100L)).willReturn(List.of(correct));
+        given(tsunTsunRepository.countPairByTargetDateAndStatus(1L, 2L, today, TsunTsunStatus.ANSWERED)).willReturn(1L);
 
         TsunTsunAnswerResponse answer = tsunTsunService.answerTsunTsun(10L, 501L);
         assertThat(answer.correct()).isTrue();
@@ -273,6 +278,7 @@ class TsunTsunServiceTest {
         given(tsunTsunRepository.findWithWordById(1L)).willReturn(Optional.of(tsun));
         given(meaningRepository.findByWordIdOrderByOrdAsc(100L)).willReturn(List.of(correct));
         given(meaningRepository.findById(502L)).willReturn(Optional.of(wrong));
+        given(tsunTsunRepository.countPairByTargetDateAndStatus(1L, 2L, today, TsunTsunStatus.ANSWERED)).willReturn(4L);
 
         TsunTsunAnswerResponse answer = tsunTsunService.answerTsunTsun(1L, 502L);
 
@@ -281,6 +287,8 @@ class TsunTsunServiceTest {
         assertThat(answer.selectedMeaningId()).isEqualTo(502L);
         assertThat(answer.correctMeaningId()).isEqualTo(501L);
         assertThat(answer.correctText()).isEqualTo("정답");
+        assertThat(answer.pairProgressCount()).isEqualTo(4L);
+        assertThat(answer.pairCompletedToday()).isFalse();
         assertThat(tsun.getStatus()).isEqualTo(TsunTsunStatus.ANSWERED);
         verify(tsunTsunAnswerRepository).save(ArgumentMatchers.any());
     }
@@ -302,6 +310,7 @@ class TsunTsunServiceTest {
 
         given(tsunTsunRepository.findWithWordById(1L)).willReturn(Optional.of(tsun));
         given(meaningRepository.findByWordIdOrderByOrdAsc(100L)).willReturn(List.of(correct));
+        given(tsunTsunRepository.countPairByTargetDateAndStatus(1L, 2L, today, TsunTsunStatus.ANSWERED)).willReturn(10L);
 
         TsunTsunAnswerResponse answer = tsunTsunService.answerTsunTsun(1L, -1L);
 
@@ -309,6 +318,8 @@ class TsunTsunServiceTest {
         assertThat(answer.selectedMeaningId()).isEqualTo(-1L);
         assertThat(answer.correctMeaningId()).isEqualTo(501L);
         assertThat(answer.correctText()).isEqualTo("정답");
+        assertThat(answer.pairProgressCount()).isEqualTo(10L);
+        assertThat(answer.pairCompletedToday()).isTrue();
     }
 
     @Test
@@ -375,6 +386,41 @@ class TsunTsunServiceTest {
         assertThatThrownBy(() -> tsunTsunService.getInbox(999L))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("User not found: 999");
+    }
+
+    @Test
+    void getTodayTsunTsuns_returnsAnsweredCountAsProgress() {
+        LocalDate today = LocalDate.now();
+        User user = new User(1L, "u", WordLevel.N4, "AAAA1111");
+        User buddy = new User(2L, "b", WordLevel.N4, "BBBB2222");
+        Word word = new Word("あ", "あ", WordLevel.N4);
+        ReflectionTestUtils.setField(word, "id", 1021L);
+
+        given(userRepository.existsById(1L)).willReturn(true);
+        given(userRepository.existsById(2L)).willReturn(true);
+        given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(1L, 2L, BuddyStatus.ACTIVE)).willReturn(true);
+        given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(2L, 1L, BuddyStatus.ACTIVE)).willReturn(true);
+
+        DailyWordSet buddySet = mock(DailyWordSet.class);
+        DailyWordItem buddyItem = mock(DailyWordItem.class);
+        given(dailyWordSetRepository.findWithItemsByUserIdAndTargetDate(2L, today)).willReturn(Optional.of(buddySet));
+        given(buddySet.getItems()).willReturn(List.of(buddyItem));
+        given(buddyItem.getId()).willReturn(21L);
+        given(buddyItem.getWord()).willReturn(word);
+
+        TsunTsun answered = TsunTsun.sent(user, buddy, word, buddyItem, today);
+        answered.markAnswered();
+        ReflectionTestUtils.setField(answered, "id", 31L);
+        given(tsunTsunRepository.findPairByTargetDate(1L, 2L, today)).willReturn(List.of(answered));
+        given(tsunTsunRepository.countPairByTargetDateAndStatus(1L, 2L, today, TsunTsunStatus.ANSWERED)).willReturn(1L);
+
+        var response = tsunTsunService.getTodayTsunTsuns(1L, 2L);
+
+        assertThat(response.progressCount()).isEqualTo(1L);
+        assertThat(response.progressGoal()).isEqualTo(10L);
+        assertThat(response.pairCompletedToday()).isFalse();
+        assertThat(response.sentCount()).isEqualTo(1L);
+        assertThat(response.receivedCount()).isEqualTo(0L);
     }
 
     private DailyWordItem mockDailyWordItem(Long id, User receiver, LocalDate targetDate) {
