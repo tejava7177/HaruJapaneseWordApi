@@ -70,7 +70,7 @@ class TsunTsunServiceTest {
     }
 
     @Test
-    void sendTsunTsun_failsWhenPendingExists() {
+    void sendTsunTsun_failsWhenSenderAlreadyHasPendingTsunTsun() {
         LocalDate today = LocalDate.now();
         User sender = new User(1L, "s", WordLevel.N4, "AAAA1111");
         User receiver = new User(2L, "r", WordLevel.N4, "BBBB2222");
@@ -81,10 +81,30 @@ class TsunTsunServiceTest {
         given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(2L, 1L, BuddyStatus.ACTIVE)).willReturn(true);
         given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDate(1L, 2L, today)).willReturn(0L);
         given(tsunTsunRepository.existsBySenderIdAndReceiverIdAndTargetDateAndStatus(1L, 2L, today, TsunTsunStatus.SENT)).willReturn(true);
+        given(tsunTsunRepository.existsBySenderIdAndReceiverIdAndTargetDateAndStatus(2L, 1L, today, TsunTsunStatus.SENT)).willReturn(false);
 
         assertThatThrownBy(() -> tsunTsunService.sendTsunTsun(1L, 2L, 11L))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("이전 츤츤에 답하지 않았습니다");
+    }
+
+    @Test
+    void sendTsunTsun_failsWhenReceiverHasUnansweredTsunTsunForSender() {
+        LocalDate today = LocalDate.now();
+        User sender = new User(2L, "b", WordLevel.N4, "BBBB2222");
+        User receiver = new User(1L, "a", WordLevel.N4, "AAAA1111");
+
+        given(userRepository.findById(2L)).willReturn(Optional.of(sender));
+        given(userRepository.findById(1L)).willReturn(Optional.of(receiver));
+        given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(2L, 1L, BuddyStatus.ACTIVE)).willReturn(true);
+        given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(1L, 2L, BuddyStatus.ACTIVE)).willReturn(true);
+        given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDate(2L, 1L, today)).willReturn(0L);
+        given(tsunTsunRepository.existsBySenderIdAndReceiverIdAndTargetDateAndStatus(2L, 1L, today, TsunTsunStatus.SENT)).willReturn(false);
+        given(tsunTsunRepository.existsBySenderIdAndReceiverIdAndTargetDateAndStatus(1L, 2L, today, TsunTsunStatus.SENT)).willReturn(true);
+
+        assertThatThrownBy(() -> tsunTsunService.sendTsunTsun(2L, 1L, 11L))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("먼저 받은 츤츤에 답해주세요. 답변 후 새 츤츤을 보낼 수 있어요.");
     }
 
     @Test
@@ -124,6 +144,7 @@ class TsunTsunServiceTest {
         given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDate(1L, 2L, today)).willReturn(10L);
         given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDate(1L, 3L, today)).willReturn(0L);
         given(tsunTsunRepository.existsBySenderIdAndReceiverIdAndTargetDateAndStatus(1L, 3L, today, TsunTsunStatus.SENT)).willReturn(false);
+        given(tsunTsunRepository.existsBySenderIdAndReceiverIdAndTargetDateAndStatus(3L, 1L, today, TsunTsunStatus.SENT)).willReturn(false);
         given(tsunTsunRepository.existsBySenderIdAndReceiverIdAndDailyWordItemIdAndTargetDate(1L, 3L, 12L, today)).willReturn(false);
 
         DailyWordItem item = mockDailyWordItem(12L, buddyC, today);
@@ -185,6 +206,49 @@ class TsunTsunServiceTest {
 
         TsunTsunQuizResponse next = tsunTsunService.sendTsunTsun(1L, 2L, 11L);
         assertThat(next.tsuntsunId()).isEqualTo(88L);
+    }
+
+    @Test
+    void sendTsunTsun_isAllowedInReverseDirectionAfterAnswer() {
+        LocalDate today = LocalDate.now();
+        User userA = new User(1L, "a", WordLevel.N4, "AAAA1111");
+        User userB = new User(2L, "b", WordLevel.N4, "BBBB2222");
+
+        Word receivedWord = new Word("ああ", "ああ", WordLevel.N4);
+        ReflectionTestUtils.setField(receivedWord, "id", 100L);
+        Meaning correct = new Meaning(receivedWord, "정답", 1);
+        ReflectionTestUtils.setField(correct, "id", 501L);
+
+        DailyWordItem receivedItem = mock(DailyWordItem.class);
+        TsunTsun receivedTsun = TsunTsun.sent(userA, userB, receivedWord, receivedItem, today);
+
+        given(tsunTsunRepository.findWithWordById(10L)).willReturn(Optional.of(receivedTsun));
+        given(meaningRepository.findByWordIdOrderByOrdAsc(100L)).willReturn(List.of(correct));
+
+        TsunTsunAnswerResponse answer = tsunTsunService.answerTsunTsun(10L, 501L);
+        assertThat(answer.correct()).isTrue();
+
+        DailyWordItem sendItem = mockDailyWordItem(12L, userA, today);
+        Word sendWord = sendItem.getWord();
+
+        given(userRepository.findById(2L)).willReturn(Optional.of(userB));
+        given(userRepository.findById(1L)).willReturn(Optional.of(userA));
+        given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(2L, 1L, BuddyStatus.ACTIVE)).willReturn(true);
+        given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(1L, 2L, BuddyStatus.ACTIVE)).willReturn(true);
+        given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDate(2L, 1L, today)).willReturn(0L);
+        given(tsunTsunRepository.existsBySenderIdAndReceiverIdAndTargetDateAndStatus(2L, 1L, today, TsunTsunStatus.SENT)).willReturn(false);
+        given(tsunTsunRepository.existsBySenderIdAndReceiverIdAndTargetDateAndStatus(1L, 2L, today, TsunTsunStatus.SENT)).willReturn(false);
+        given(tsunTsunRepository.existsBySenderIdAndReceiverIdAndDailyWordItemIdAndTargetDate(2L, 1L, 12L, today)).willReturn(false);
+        given(dailyWordItemRepository.findById(12L)).willReturn(Optional.of(sendItem));
+
+        TsunTsun saved = TsunTsun.sent(userB, userA, sendWord, sendItem, today);
+        ReflectionTestUtils.setField(saved, "id", 77L);
+        given(tsunTsunRepository.save(ArgumentMatchers.any(TsunTsun.class))).willReturn(saved);
+        given(tsunTsunQuizService.generateChoices(sendWord)).willReturn(List.of(new QuizChoiceResponse(601L, "뜻")));
+
+        TsunTsunQuizResponse response = tsunTsunService.sendTsunTsun(2L, 1L, 12L);
+
+        assertThat(response.tsuntsunId()).isEqualTo(77L);
     }
 
     @Test

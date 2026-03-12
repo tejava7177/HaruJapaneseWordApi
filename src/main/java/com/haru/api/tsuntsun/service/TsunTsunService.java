@@ -46,6 +46,7 @@ public class TsunTsunService {
     private static final long GIVE_UP_CHOICE_ID = -1L;
     private static final String GIVE_UP_TEXT = "모르겠어요";
     private static final String UNKNOWN_MEANING_TEXT = "알 수 없는 뜻";
+    private static final String PENDING_RECEIVED_TSUNTSUN_MESSAGE = "먼저 받은 츤츤에 답해주세요. 답변 후 새 츤츤을 보낼 수 있어요.";
 
     private final TsunTsunRepository tsunTsunRepository;
     private final TsunTsunAnswerRepository tsunTsunAnswerRepository;
@@ -59,6 +60,9 @@ public class TsunTsunService {
 
     @Transactional
     public TsunTsunQuizResponse sendTsunTsun(Long senderId, Long receiverId, Long dailyWordItemId) {
+        log.info("[tsuntsun/send] request received: senderId={}, receiverId={}, dailyWordItemId={}",
+                senderId, receiverId, dailyWordItemId);
+
         if (senderId.equals(receiverId)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Sender and receiver must be different");
         }
@@ -77,14 +81,27 @@ public class TsunTsunService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "버디 페어당 하루 최대 10회까지만 전송할 수 있습니다.");
         }
 
-        boolean hasPending = tsunTsunRepository.existsBySenderIdAndReceiverIdAndTargetDateAndStatus(
+        boolean hasPendingSentBySender = tsunTsunRepository.existsBySenderIdAndReceiverIdAndTargetDateAndStatus(
                 senderId,
                 receiverId,
                 today,
                 TsunTsunStatus.SENT
         );
-        if (hasPending) {
+        boolean hasPendingReceivedFromBuddy = tsunTsunRepository.existsBySenderIdAndReceiverIdAndTargetDateAndStatus(
+                receiverId,
+                senderId,
+                today,
+                TsunTsunStatus.SENT
+        );
+
+        log.info("[tsuntsun/send] pair rule check: senderId={}, receiverId={}, targetDate={}, hasPendingSentBySender={}, hasPendingReceivedFromBuddy={}",
+                senderId, receiverId, today, hasPendingSentBySender, hasPendingReceivedFromBuddy);
+
+        if (hasPendingSentBySender) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "상대가 아직 이전 츤츤에 답하지 않았습니다.");
+        }
+        if (hasPendingReceivedFromBuddy) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, PENDING_RECEIVED_TSUNTSUN_MESSAGE);
         }
 
         boolean alreadySentSameItem = tsunTsunRepository.existsBySenderIdAndReceiverIdAndDailyWordItemIdAndTargetDate(
@@ -110,6 +127,9 @@ public class TsunTsunService {
 
         Word word = dailyWordItem.getWord();
         TsunTsun saved = tsunTsunRepository.save(TsunTsun.sent(sender, receiver, word, dailyWordItem, today));
+
+        log.info("[tsuntsun/send] send created: tsuntsunId={}, senderId={}, receiverId={}, targetDate={}",
+                saved.getId(), senderId, receiverId, today);
 
         List<QuizChoiceResponse> choices = tsunTsunQuizService.generateChoices(word);
         apnsPushService.sendTsunTsunPush(receiverId, saved.getId());
