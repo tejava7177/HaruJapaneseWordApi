@@ -24,6 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(TsunTsunController.class)
@@ -63,7 +64,7 @@ class TsunTsunControllerTest {
 
     @Test
     void answerTsunTsun_returnsAnswerResult() throws Exception {
-        TsunTsunAnswerResponse response = new TsunTsunAnswerResponse(1L, true, 100L, "인사", 100L, "인사", TsunTsunStatus.ANSWERED);
+        TsunTsunAnswerResponse response = new TsunTsunAnswerResponse(1L, true, 100L, 100L, "인사");
         given(tsunTsunService.answerTsunTsun(1L, 100L)).willReturn(response);
 
         mockMvc.perform(post("/api/tsuntsun/answer")
@@ -74,8 +75,39 @@ class TsunTsunControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.correct").value(true))
                 .andExpect(jsonPath("$.selectedMeaningId").value(100))
-                .andExpect(jsonPath("$.correctText").value("인사"))
-                .andExpect(jsonPath("$.status").value("ANSWERED"));
+                .andExpect(jsonPath("$.correctMeaningId").value(100))
+                .andExpect(jsonPath("$.correctText").value("인사"));
+    }
+
+    @Test
+    void answerTsunTsun_returnsWrongResultWithOkStatus() throws Exception {
+        TsunTsunAnswerResponse response = new TsunTsunAnswerResponse(11L, false, 3222L, 100L, "보통");
+        given(tsunTsunService.answerTsunTsun(11L, 3222L)).willReturn(response);
+
+        mockMvc.perform(post("/api/tsuntsun/answer")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"tsuntsunId":11,"meaningId":3222}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tsuntsunId").value(11))
+                .andExpect(jsonPath("$.correct").value(false))
+                .andExpect(jsonPath("$.selectedMeaningId").value(3222))
+                .andExpect(jsonPath("$.correctMeaningId").value(100))
+                .andExpect(jsonPath("$.correctText").value("보통"));
+    }
+
+    @Test
+    void answerTsunTsun_returnsBadRequestOnlyWhenAlreadyAnswered() throws Exception {
+        given(tsunTsunService.answerTsunTsun(11L, 100L))
+                .willThrow(new ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "이미 답변한 츤츤입니다."));
+
+        mockMvc.perform(post("/api/tsuntsun/answer")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"tsuntsunId":11,"meaningId":100}
+                                """))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

@@ -44,6 +44,8 @@ public class TsunTsunService {
 
     private static final int DAILY_SEND_LIMIT_PER_BUDDY = 10;
     private static final long GIVE_UP_CHOICE_ID = -1L;
+    private static final String GIVE_UP_TEXT = "모르겠어요";
+    private static final String UNKNOWN_MEANING_TEXT = "알 수 없는 뜻";
 
     private final TsunTsunRepository tsunTsunRepository;
     private final TsunTsunAnswerRepository tsunTsunAnswerRepository;
@@ -121,7 +123,7 @@ public class TsunTsunService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "TsunTsun not found: " + tsuntsunId));
 
         if (tsunTsun.getStatus() == TsunTsunStatus.ANSWERED) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "TsunTsun already answered");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미 답변한 츤츤입니다.");
         }
 
         List<Meaning> meanings = meaningRepository.findByWordIdOrderByOrdAsc(tsunTsun.getWord().getId());
@@ -130,21 +132,8 @@ public class TsunTsunService {
         }
 
         Meaning correctMeaning = meanings.get(0);
-        boolean isCorrect;
-        String selectedMeaningText;
-
-        if (meaningId == GIVE_UP_CHOICE_ID) {
-            isCorrect = false;
-            selectedMeaningText = "모르겠어요";
-        } else {
-            Meaning selectedMeaning = meanings.stream()
-                    .filter(meaning -> meaning.getId().equals(meaningId))
-                    .findFirst()
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Meaning not valid for this quiz"));
-
-            isCorrect = selectedMeaning.getId().equals(correctMeaning.getId());
-            selectedMeaningText = selectedMeaning.getText();
-        }
+        boolean isCorrect = correctMeaning.getId().equals(meaningId);
+        String selectedMeaningText = resolveSelectedMeaningText(meaningId);
 
         tsunTsun.markAnswered();
         tsunTsunAnswerRepository.save(TsunTsunAnswer.of(tsunTsun, selectedMeaningText, isCorrect));
@@ -153,11 +142,19 @@ public class TsunTsunService {
                 tsuntsunId,
                 isCorrect,
                 meaningId,
-                selectedMeaningText,
                 correctMeaning.getId(),
-                correctMeaning.getText(),
-                tsunTsun.getStatus()
+                correctMeaning.getText()
         );
+    }
+
+    private String resolveSelectedMeaningText(Long meaningId) {
+        if (meaningId.equals(GIVE_UP_CHOICE_ID)) {
+            return GIVE_UP_TEXT;
+        }
+
+        return meaningRepository.findById(meaningId)
+                .map(Meaning::getText)
+                .orElse(UNKNOWN_MEANING_TEXT);
     }
 
     @Transactional(readOnly = true)

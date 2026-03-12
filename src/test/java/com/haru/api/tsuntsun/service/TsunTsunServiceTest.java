@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 import com.haru.api.buddy.domain.BuddyStatus;
 import com.haru.api.buddy.repository.BuddyRepository;
@@ -165,8 +166,8 @@ class TsunTsunServiceTest {
         TsunTsunAnswerResponse answer = tsunTsunService.answerTsunTsun(1L, 501L);
         assertThat(answer.correct()).isTrue();
         assertThat(answer.selectedMeaningId()).isEqualTo(501L);
+        assertThat(answer.correctMeaningId()).isEqualTo(501L);
         assertThat(answer.correctText()).isEqualTo("정답");
-        assertThat(answer.status()).isEqualTo(TsunTsunStatus.ANSWERED);
 
         given(userRepository.findById(1L)).willReturn(Optional.of(sender));
         given(userRepository.findById(2L)).willReturn(Optional.of(receiver));
@@ -184,6 +185,86 @@ class TsunTsunServiceTest {
 
         TsunTsunQuizResponse next = tsunTsunService.sendTsunTsun(1L, 2L, 11L);
         assertThat(next.tsuntsunId()).isEqualTo(88L);
+    }
+
+    @Test
+    void answerTsunTsun_returnsWrongResultForWrongChoiceFromAnotherWord() {
+        LocalDate today = LocalDate.now();
+        User sender = new User(1L, "s", WordLevel.N4, "AAAA1111");
+        User receiver = new User(2L, "r", WordLevel.N4, "BBBB2222");
+
+        Word word = new Word("ああ", "ああ", WordLevel.N4);
+        ReflectionTestUtils.setField(word, "id", 100L);
+
+        Meaning correct = new Meaning(word, "정답", 1);
+        ReflectionTestUtils.setField(correct, "id", 501L);
+
+        DailyWordItem item = mock(DailyWordItem.class);
+        TsunTsun tsun = TsunTsun.sent(sender, receiver, word, item, today);
+
+        Word wrongWord = new Word("べつ", "べつ", WordLevel.N4);
+        Meaning wrong = new Meaning(wrongWord, "오답", 1);
+        ReflectionTestUtils.setField(wrong, "id", 502L);
+
+        given(tsunTsunRepository.findWithWordById(1L)).willReturn(Optional.of(tsun));
+        given(meaningRepository.findByWordIdOrderByOrdAsc(100L)).willReturn(List.of(correct));
+        given(meaningRepository.findById(502L)).willReturn(Optional.of(wrong));
+
+        TsunTsunAnswerResponse answer = tsunTsunService.answerTsunTsun(1L, 502L);
+
+        assertThat(answer.tsuntsunId()).isEqualTo(1L);
+        assertThat(answer.correct()).isFalse();
+        assertThat(answer.selectedMeaningId()).isEqualTo(502L);
+        assertThat(answer.correctMeaningId()).isEqualTo(501L);
+        assertThat(answer.correctText()).isEqualTo("정답");
+        assertThat(tsun.getStatus()).isEqualTo(TsunTsunStatus.ANSWERED);
+        verify(tsunTsunAnswerRepository).save(ArgumentMatchers.any());
+    }
+
+    @Test
+    void answerTsunTsun_returnsWrongResultForGiveUpChoice() {
+        LocalDate today = LocalDate.now();
+        User sender = new User(1L, "s", WordLevel.N4, "AAAA1111");
+        User receiver = new User(2L, "r", WordLevel.N4, "BBBB2222");
+
+        Word word = new Word("ああ", "ああ", WordLevel.N4);
+        ReflectionTestUtils.setField(word, "id", 100L);
+
+        Meaning correct = new Meaning(word, "정답", 1);
+        ReflectionTestUtils.setField(correct, "id", 501L);
+
+        DailyWordItem item = mock(DailyWordItem.class);
+        TsunTsun tsun = TsunTsun.sent(sender, receiver, word, item, today);
+
+        given(tsunTsunRepository.findWithWordById(1L)).willReturn(Optional.of(tsun));
+        given(meaningRepository.findByWordIdOrderByOrdAsc(100L)).willReturn(List.of(correct));
+
+        TsunTsunAnswerResponse answer = tsunTsunService.answerTsunTsun(1L, -1L);
+
+        assertThat(answer.correct()).isFalse();
+        assertThat(answer.selectedMeaningId()).isEqualTo(-1L);
+        assertThat(answer.correctMeaningId()).isEqualTo(501L);
+        assertThat(answer.correctText()).isEqualTo("정답");
+    }
+
+    @Test
+    void answerTsunTsun_failsWhenAlreadyAnswered() {
+        LocalDate today = LocalDate.now();
+        User sender = new User(1L, "s", WordLevel.N4, "AAAA1111");
+        User receiver = new User(2L, "r", WordLevel.N4, "BBBB2222");
+
+        Word word = new Word("ああ", "ああ", WordLevel.N4);
+        ReflectionTestUtils.setField(word, "id", 100L);
+
+        DailyWordItem item = mock(DailyWordItem.class);
+        TsunTsun tsun = TsunTsun.sent(sender, receiver, word, item, today);
+        tsun.markAnswered();
+
+        given(tsunTsunRepository.findWithWordById(1L)).willReturn(Optional.of(tsun));
+
+        assertThatThrownBy(() -> tsunTsunService.answerTsunTsun(1L, 501L))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("이미 답변한 츤츤입니다.");
     }
 
     @Test
