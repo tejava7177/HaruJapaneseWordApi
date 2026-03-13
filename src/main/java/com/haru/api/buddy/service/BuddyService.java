@@ -1,9 +1,13 @@
 package com.haru.api.buddy.service;
 
 import com.haru.api.buddy.domain.Buddy;
+import com.haru.api.buddy.domain.BuddyRelationship;
 import com.haru.api.buddy.domain.BuddyStatus;
 import com.haru.api.buddy.dto.BuddyResponse;
+import com.haru.api.buddy.repository.BuddyRelationshipRepository;
 import com.haru.api.buddy.repository.BuddyRepository;
+import com.haru.api.tsuntsun.domain.TsunTsunStatus;
+import com.haru.api.tsuntsun.repository.TsunTsunRepository;
 import com.haru.api.user.domain.User;
 import com.haru.api.user.repository.UserRepository;
 import java.util.List;
@@ -20,14 +24,16 @@ public class BuddyService {
 
     private static final int MAX_BUDDY_COUNT = 3;
 
+    private final BuddyRelationshipRepository buddyRelationshipRepository;
     private final BuddyRepository buddyRepository;
+    private final TsunTsunRepository tsunTsunRepository;
     private final UserRepository userRepository;
 
     public List<BuddyResponse> getBuddies(Long userId) {
         ensureUserExists(userId);
         return buddyRepository.findByUserIdAndStatusOrderByCreatedAtAsc(userId, BuddyStatus.ACTIVE)
                 .stream()
-                .map(BuddyResponse::from)
+                .map(this::toBuddyResponse)
                 .toList();
     }
 
@@ -66,11 +72,42 @@ public class BuddyService {
         validateBuddyLimit(user.getId());
         validateBuddyLimit(buddyUser.getId());
 
-        Buddy userToBuddy = Buddy.active(user, buddyUser);
-        Buddy buddyToUser = Buddy.active(buddyUser, user);
+        BuddyRelationship buddyRelationship = buddyRelationshipRepository.saveAndFlush(BuddyRelationship.create());
+        Long relationshipId = buddyRelationship.getId();
+        if (relationshipId == null) {
+            throw new IllegalStateException("BuddyRelationship id was not generated");
+        }
+        org.slf4j.LoggerFactory.getLogger(BuddyService.class).info(
+                "[buddy/relationship] created relationship first: relationshipId={}, userId={}, buddyUserId={}",
+                relationshipId, user.getId(), buddyUser.getId()
+        );
+        Buddy userToBuddy = Buddy.active(user, buddyUser, buddyRelationship);
+        Buddy buddyToUser = Buddy.active(buddyUser, user, buddyRelationship);
         buddyRepository.saveAll(List.of(userToBuddy, buddyToUser));
+        org.slf4j.LoggerFactory.getLogger(BuddyService.class).info(
+                "[buddy/relationship] linked relationship to buddy rows: relationshipId={}, userId={}, buddyUserId={}",
+                relationshipId, user.getId(), buddyUser.getId()
+        );
 
-        return BuddyResponse.from(userToBuddy);
+        return BuddyResponse.from(userToBuddy, 0L);
+    }
+
+    private BuddyResponse toBuddyResponse(Buddy buddy) {
+        Long buddyRelationshipId = buddy.getBuddyRelationship().getId();
+        long answeredToBuddyCount = tsunTsunRepository.countByBuddyRelationshipIdAndSenderIdAndReceiverIdAndStatus(
+                buddyRelationshipId,
+                buddy.getUser().getId(),
+                buddy.getBuddyUser().getId(),
+                TsunTsunStatus.ANSWERED
+        );
+        long answeredFromBuddyCount = tsunTsunRepository.countByBuddyRelationshipIdAndSenderIdAndReceiverIdAndStatus(
+                buddyRelationshipId,
+                buddy.getBuddyUser().getId(),
+                buddy.getUser().getId(),
+                TsunTsunStatus.ANSWERED
+        );
+        long tikiTakaCount = Math.min(answeredToBuddyCount, answeredFromBuddyCount);
+        return BuddyResponse.from(buddy, tikiTakaCount);
     }
 
     private void validateBuddyLimit(Long userId) {

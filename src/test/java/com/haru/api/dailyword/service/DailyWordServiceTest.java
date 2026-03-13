@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
+import com.haru.api.buddy.domain.BuddyRelationship;
 import com.haru.api.dailyword.domain.DailyWordSet;
 import com.haru.api.dailyword.dto.DevDailyWordRegenerateResponse;
 import com.haru.api.dailyword.repository.DailyWordSetRepository;
@@ -67,8 +68,10 @@ class DailyWordServiceTest {
         existingSet.addItem(new Word("old2", "old2", WordLevel.N4), 2);
         ReflectionTestUtils.setField(existingSet.getItems().get(0), "id", 101L);
         ReflectionTestUtils.setField(existingSet.getItems().get(1), "id", 102L);
+        BuddyRelationship relationship = BuddyRelationship.create();
+        ReflectionTestUtils.setField(relationship, "id", 77L);
         TsunTsun tsunTsun = TsunTsun.sent(user, new User(1L, "juheun", WordLevel.N4, "JUHEUN01"),
-                existingSet.getItems().get(0).getWord(), existingSet.getItems().get(0), LocalDate.now());
+                existingSet.getItems().get(0).getWord(), existingSet.getItems().get(0), relationship, LocalDate.now());
         ReflectionTestUtils.setField(tsunTsun, "id", 1001L);
 
         given(userRepository.findById(4L)).willReturn(Optional.of(user));

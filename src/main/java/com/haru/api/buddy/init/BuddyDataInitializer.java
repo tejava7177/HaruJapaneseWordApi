@@ -1,7 +1,9 @@
 package com.haru.api.buddy.init;
 
 import com.haru.api.buddy.domain.Buddy;
+import com.haru.api.buddy.domain.BuddyRelationship;
 import com.haru.api.buddy.domain.BuddyStatus;
+import com.haru.api.buddy.repository.BuddyRelationshipRepository;
 import com.haru.api.buddy.repository.BuddyRepository;
 import com.haru.api.user.domain.User;
 import com.haru.api.user.repository.UserRepository;
@@ -29,6 +31,7 @@ public class BuddyDataInitializer implements CommandLineRunner {
             new long[]{3L, 4L}
     );
 
+    private final BuddyRelationshipRepository buddyRelationshipRepository;
     private final BuddyRepository buddyRepository;
     private final UserRepository userRepository;
 
@@ -48,11 +51,6 @@ public class BuddyDataInitializer implements CommandLineRunner {
         User buddyUser = userRepository.findById(buddyUserId)
                 .orElseThrow(() -> new IllegalStateException("Missing test user: " + buddyUserId));
 
-        ensureBuddyRow(user, buddyUser);
-        ensureBuddyRow(buddyUser, user);
-    }
-
-    private void ensureBuddyRow(User user, User buddyUser) {
         boolean exists = buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(
                 user.getId(),
                 buddyUser.getId(),
@@ -64,8 +62,16 @@ public class BuddyDataInitializer implements CommandLineRunner {
             return;
         }
 
-        buddyRepository.save(Buddy.active(user, buddyUser));
-        log.info("[init] buddy relation created: userId={}, buddyId={}", user.getId(), buddyUser.getId());
+        BuddyRelationship buddyRelationship = buddyRelationshipRepository.saveAndFlush(BuddyRelationship.create());
+        Long relationshipId = buddyRelationship.getId();
+        log.info("[init] buddy relationship created first: relationshipId={}, userId={}, buddyId={}",
+                relationshipId, user.getId(), buddyUser.getId());
+        buddyRepository.saveAll(List.of(
+                Buddy.active(user, buddyUser, buddyRelationship),
+                Buddy.active(buddyUser, user, buddyRelationship)
+        ));
+        log.info("[init] buddy relation linked bidirectionally: userId={}, buddyId={}, relationshipId={}",
+                user.getId(), buddyUser.getId(), relationshipId);
     }
 
     private void logActiveBuddyState() {

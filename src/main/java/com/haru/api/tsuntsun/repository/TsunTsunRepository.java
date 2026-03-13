@@ -20,6 +20,13 @@ public interface TsunTsunRepository extends JpaRepository<TsunTsun, Long> {
             TsunTsunStatus status
     );
 
+    long countByBuddyRelationshipIdAndSenderIdAndReceiverIdAndStatus(
+            Long buddyRelationshipId,
+            Long senderId,
+            Long receiverId,
+            TsunTsunStatus status
+    );
+
     boolean existsBySenderIdAndReceiverIdAndTargetDateAndStatus(
             Long senderId,
             Long receiverId,
@@ -58,4 +65,12 @@ public interface TsunTsunRepository extends JpaRepository<TsunTsun, Long> {
     List<TsunTsun> findByDailyWordItemIdInAndTargetDate(List<Long> dailyWordItemIds, LocalDate targetDate);
 
     void deleteByDailyWordItemIdInAndTargetDate(List<Long> dailyWordItemIds, LocalDate targetDate);
+
+    @Query("""
+            select count(t)
+            from TsunTsun t
+            left join t.buddyRelationship br
+            where br is null
+            """)
+    long countWithMissingRelationship();
 }

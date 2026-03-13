@@ -14,6 +14,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
+import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -40,6 +41,10 @@ public class Buddy {
     @JoinColumn(name = "buddy_user_id", nullable = false)
     private User buddyUser;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "buddy_relationship_id", nullable = false)
+    private BuddyRelationship buddyRelationship;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private BuddyStatus status;
@@ -48,13 +53,15 @@ public class Buddy {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    private Buddy(User user, User buddyUser, BuddyStatus status) {
+    private Buddy(User user, User buddyUser, BuddyRelationship buddyRelationship, BuddyStatus status) {
         this.user = user;
         this.buddyUser = buddyUser;
+        this.buddyRelationship = buddyRelationship;
         this.status = status;
     }
 
-    public static Buddy active(User user, User buddyUser) {
-        return new Buddy(user, buddyUser, BuddyStatus.ACTIVE);
+    public static Buddy active(User user, User buddyUser, BuddyRelationship buddyRelationship) {
+        Objects.requireNonNull(buddyRelationship, "buddyRelationship must not be null");
+        return new Buddy(user, buddyUser, buddyRelationship, BuddyStatus.ACTIVE);
     }
 }

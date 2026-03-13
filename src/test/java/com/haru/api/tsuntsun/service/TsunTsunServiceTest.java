@@ -6,6 +6,8 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import com.haru.api.buddy.domain.Buddy;
+import com.haru.api.buddy.domain.BuddyRelationship;
 import com.haru.api.buddy.domain.BuddyStatus;
 import com.haru.api.buddy.repository.BuddyRepository;
 import com.haru.api.dailyword.domain.DailyWordItem;
@@ -77,7 +79,8 @@ class TsunTsunServiceTest {
 
         given(userRepository.findById(1L)).willReturn(Optional.of(sender));
         given(userRepository.findById(2L)).willReturn(Optional.of(receiver));
-        given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(1L, 2L, BuddyStatus.ACTIVE)).willReturn(true);
+        given(buddyRepository.findByUserIdAndBuddyUserIdAndStatus(1L, 2L, BuddyStatus.ACTIVE))
+                .willReturn(Optional.of(mockActiveBuddy(sender, receiver, 10L)));
         given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(2L, 1L, BuddyStatus.ACTIVE)).willReturn(true);
         given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDate(1L, 2L, today)).willReturn(0L);
         given(tsunTsunRepository.existsBySenderIdAndReceiverIdAndTargetDateAndStatus(1L, 2L, today, TsunTsunStatus.SENT)).willReturn(true);
@@ -96,7 +99,8 @@ class TsunTsunServiceTest {
 
         given(userRepository.findById(2L)).willReturn(Optional.of(sender));
         given(userRepository.findById(1L)).willReturn(Optional.of(receiver));
-        given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(2L, 1L, BuddyStatus.ACTIVE)).willReturn(true);
+        given(buddyRepository.findByUserIdAndBuddyUserIdAndStatus(2L, 1L, BuddyStatus.ACTIVE))
+                .willReturn(Optional.of(mockActiveBuddy(sender, receiver, 10L)));
         given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(1L, 2L, BuddyStatus.ACTIVE)).willReturn(true);
         given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDate(2L, 1L, today)).willReturn(0L);
         given(tsunTsunRepository.existsBySenderIdAndReceiverIdAndTargetDateAndStatus(2L, 1L, today, TsunTsunStatus.SENT)).willReturn(false);
@@ -115,7 +119,8 @@ class TsunTsunServiceTest {
 
         given(userRepository.findById(1L)).willReturn(Optional.of(sender));
         given(userRepository.findById(2L)).willReturn(Optional.of(receiver));
-        given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(1L, 2L, BuddyStatus.ACTIVE)).willReturn(true);
+        given(buddyRepository.findByUserIdAndBuddyUserIdAndStatus(1L, 2L, BuddyStatus.ACTIVE))
+                .willReturn(Optional.of(mockActiveBuddy(sender, receiver, 10L)));
         given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(2L, 1L, BuddyStatus.ACTIVE)).willReturn(true);
         given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDate(1L, 2L, today)).willReturn(0L);
         given(tsunTsunRepository.existsBySenderIdAndReceiverIdAndTargetDateAndStatus(1L, 2L, today, TsunTsunStatus.SENT)).willReturn(false);
@@ -136,9 +141,11 @@ class TsunTsunServiceTest {
         given(userRepository.findById(1L)).willReturn(Optional.of(sender));
         given(userRepository.findById(2L)).willReturn(Optional.of(buddyB));
         given(userRepository.findById(3L)).willReturn(Optional.of(buddyC));
-        given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(1L, 2L, BuddyStatus.ACTIVE)).willReturn(true);
+        given(buddyRepository.findByUserIdAndBuddyUserIdAndStatus(1L, 2L, BuddyStatus.ACTIVE))
+                .willReturn(Optional.of(mockActiveBuddy(sender, buddyB, 20L)));
+        given(buddyRepository.findByUserIdAndBuddyUserIdAndStatus(1L, 3L, BuddyStatus.ACTIVE))
+                .willReturn(Optional.of(mockActiveBuddy(sender, buddyC, 30L)));
         given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(2L, 1L, BuddyStatus.ACTIVE)).willReturn(true);
-        given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(1L, 3L, BuddyStatus.ACTIVE)).willReturn(true);
         given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(3L, 1L, BuddyStatus.ACTIVE)).willReturn(true);
 
         given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDate(1L, 2L, today)).willReturn(10L);
@@ -151,7 +158,7 @@ class TsunTsunServiceTest {
         given(dailyWordItemRepository.findById(12L)).willReturn(Optional.of(item));
 
         Word word = item.getWord();
-        TsunTsun saved = TsunTsun.sent(sender, buddyC, word, item, today);
+        TsunTsun saved = testTsunTsun(sender, buddyC, word, item, 30L, today);
         ReflectionTestUtils.setField(saved, "id", 99L);
         given(tsunTsunRepository.save(ArgumentMatchers.any(TsunTsun.class))).willReturn(saved);
         given(tsunTsunQuizService.generateChoices(word)).willReturn(List.of(new QuizChoiceResponse(1L, "뜻")));
@@ -180,7 +187,7 @@ class TsunTsunServiceTest {
 
         DailyWordItem item = mockDailyWordItem(11L, receiver, today);
 
-        TsunTsun tsun = TsunTsun.sent(sender, receiver, word, item, today);
+        TsunTsun tsun = testTsunTsun(sender, receiver, word, item, 10L, today);
         given(tsunTsunRepository.findWithWordById(1L)).willReturn(Optional.of(tsun));
         given(meaningRepository.findByWordIdOrderByOrdAsc(100L)).willReturn(List.of(correct, wrong));
         given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDateAndStatus(1L, 2L, today, TsunTsunStatus.ANSWERED)).willReturn(1L);
@@ -197,14 +204,15 @@ class TsunTsunServiceTest {
 
         given(userRepository.findById(1L)).willReturn(Optional.of(sender));
         given(userRepository.findById(2L)).willReturn(Optional.of(receiver));
-        given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(1L, 2L, BuddyStatus.ACTIVE)).willReturn(true);
+        given(buddyRepository.findByUserIdAndBuddyUserIdAndStatus(1L, 2L, BuddyStatus.ACTIVE))
+                .willReturn(Optional.of(mockActiveBuddy(sender, receiver, 10L)));
         given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(2L, 1L, BuddyStatus.ACTIVE)).willReturn(true);
         given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDate(1L, 2L, today)).willReturn(1L);
         given(tsunTsunRepository.existsBySenderIdAndReceiverIdAndTargetDateAndStatus(1L, 2L, today, TsunTsunStatus.SENT)).willReturn(false);
         given(tsunTsunRepository.existsBySenderIdAndReceiverIdAndDailyWordItemIdAndTargetDate(1L, 2L, 11L, today)).willReturn(false);
         given(dailyWordItemRepository.findById(11L)).willReturn(Optional.of(item));
         Word sendWord = item.getWord();
-        TsunTsun saved = TsunTsun.sent(sender, receiver, sendWord, item, today);
+        TsunTsun saved = testTsunTsun(sender, receiver, sendWord, item, 10L, today);
         ReflectionTestUtils.setField(saved, "id", 88L);
         given(tsunTsunRepository.save(ArgumentMatchers.any(TsunTsun.class))).willReturn(saved);
         given(tsunTsunQuizService.generateChoices(sendWord)).willReturn(List.of(new QuizChoiceResponse(501L, "정답")));
@@ -225,7 +233,7 @@ class TsunTsunServiceTest {
         ReflectionTestUtils.setField(correct, "id", 501L);
 
         DailyWordItem receivedItem = mock(DailyWordItem.class);
-        TsunTsun receivedTsun = TsunTsun.sent(userA, userB, receivedWord, receivedItem, today);
+        TsunTsun receivedTsun = testTsunTsun(userA, userB, receivedWord, receivedItem, 10L, today);
 
         given(tsunTsunRepository.findWithWordById(10L)).willReturn(Optional.of(receivedTsun));
         given(meaningRepository.findByWordIdOrderByOrdAsc(100L)).willReturn(List.of(correct));
@@ -240,7 +248,8 @@ class TsunTsunServiceTest {
 
         given(userRepository.findById(2L)).willReturn(Optional.of(userB));
         given(userRepository.findById(1L)).willReturn(Optional.of(userA));
-        given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(2L, 1L, BuddyStatus.ACTIVE)).willReturn(true);
+        given(buddyRepository.findByUserIdAndBuddyUserIdAndStatus(2L, 1L, BuddyStatus.ACTIVE))
+                .willReturn(Optional.of(mockActiveBuddy(userB, userA, 10L)));
         given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(1L, 2L, BuddyStatus.ACTIVE)).willReturn(true);
         given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDate(2L, 1L, today)).willReturn(0L);
         given(tsunTsunRepository.existsBySenderIdAndReceiverIdAndTargetDateAndStatus(2L, 1L, today, TsunTsunStatus.SENT)).willReturn(false);
@@ -248,7 +257,7 @@ class TsunTsunServiceTest {
         given(tsunTsunRepository.existsBySenderIdAndReceiverIdAndDailyWordItemIdAndTargetDate(2L, 1L, 12L, today)).willReturn(false);
         given(dailyWordItemRepository.findById(12L)).willReturn(Optional.of(sendItem));
 
-        TsunTsun saved = TsunTsun.sent(userB, userA, sendWord, sendItem, today);
+        TsunTsun saved = testTsunTsun(userB, userA, sendWord, sendItem, 10L, today);
         ReflectionTestUtils.setField(saved, "id", 77L);
         given(tsunTsunRepository.save(ArgumentMatchers.any(TsunTsun.class))).willReturn(saved);
         given(tsunTsunQuizService.generateChoices(sendWord)).willReturn(List.of(new QuizChoiceResponse(601L, "뜻")));
@@ -256,6 +265,27 @@ class TsunTsunServiceTest {
         TsunTsunQuizResponse response = tsunTsunService.sendTsunTsun(2L, 1L, 12L);
 
         assertThat(response.tsuntsunId()).isEqualTo(77L);
+    }
+
+    private Buddy mockActiveBuddy(User user, User buddyUser, Long relationshipId) {
+        BuddyRelationship relationship = BuddyRelationship.create();
+        ReflectionTestUtils.setField(relationship, "id", relationshipId);
+        Buddy buddy = Buddy.active(user, buddyUser, relationship);
+        ReflectionTestUtils.setField(buddy, "id", relationshipId + 100L);
+        return buddy;
+    }
+
+    private TsunTsun testTsunTsun(
+            User sender,
+            User receiver,
+            Word word,
+            DailyWordItem item,
+            Long relationshipId,
+            LocalDate targetDate
+    ) {
+        BuddyRelationship relationship = BuddyRelationship.create();
+        ReflectionTestUtils.setField(relationship, "id", relationshipId);
+        return TsunTsun.sent(sender, receiver, word, item, relationship, targetDate);
     }
 
     @Test
@@ -271,7 +301,7 @@ class TsunTsunServiceTest {
         ReflectionTestUtils.setField(correct, "id", 501L);
 
         DailyWordItem item = mock(DailyWordItem.class);
-        TsunTsun tsun = TsunTsun.sent(sender, receiver, word, item, today);
+        TsunTsun tsun = testTsunTsun(sender, receiver, word, item, 10L, today);
 
         Word wrongWord = new Word("べつ", "べつ", WordLevel.N4);
         Meaning wrong = new Meaning(wrongWord, "오답", 1);
@@ -309,7 +339,7 @@ class TsunTsunServiceTest {
         ReflectionTestUtils.setField(correct, "id", 501L);
 
         DailyWordItem item = mock(DailyWordItem.class);
-        TsunTsun tsun = TsunTsun.sent(sender, receiver, word, item, today);
+        TsunTsun tsun = testTsunTsun(sender, receiver, word, item, 10L, today);
 
         given(tsunTsunRepository.findWithWordById(1L)).willReturn(Optional.of(tsun));
         given(meaningRepository.findByWordIdOrderByOrdAsc(100L)).willReturn(List.of(correct));
@@ -336,7 +366,7 @@ class TsunTsunServiceTest {
         ReflectionTestUtils.setField(word, "id", 100L);
 
         DailyWordItem item = mock(DailyWordItem.class);
-        TsunTsun tsun = TsunTsun.sent(sender, receiver, word, item, today);
+        TsunTsun tsun = testTsunTsun(sender, receiver, word, item, 10L, today);
         tsun.markAnswered();
 
         given(tsunTsunRepository.findWithWordById(1L)).willReturn(Optional.of(tsun));
@@ -368,7 +398,7 @@ class TsunTsunServiceTest {
         DailyWordItem item = mock(DailyWordItem.class);
         given(userRepository.existsById(2L)).willReturn(true);
 
-        TsunTsun tsunTsun = TsunTsun.sent(sender, receiver, word, item, today);
+        TsunTsun tsunTsun = testTsunTsun(sender, receiver, word, item, 10L, today);
         ReflectionTestUtils.setField(tsunTsun, "id", 11L);
         given(tsunTsunRepository.findByReceiverIdAndTargetDateAndStatusOrderByCreatedAtDesc(2L, today, TsunTsunStatus.SENT))
                 .willReturn(List.of(tsunTsun));
@@ -412,7 +442,7 @@ class TsunTsunServiceTest {
         given(buddyItem.getId()).willReturn(21L);
         given(buddyItem.getWord()).willReturn(word);
 
-        TsunTsun answered = TsunTsun.sent(user, buddy, word, buddyItem, today);
+        TsunTsun answered = testTsunTsun(user, buddy, word, buddyItem, 10L, today);
         answered.markAnswered();
         ReflectionTestUtils.setField(answered, "id", 31L);
         given(tsunTsunRepository.findPairByTargetDate(1L, 2L, today)).willReturn(List.of(answered));
@@ -448,7 +478,7 @@ class TsunTsunServiceTest {
         given(buddyItem.getId()).willReturn(31L);
         given(buddyItem.getWord()).willReturn(word);
 
-        TsunTsun sentOnly = TsunTsun.sent(user, buddy, word, buddyItem, today);
+        TsunTsun sentOnly = testTsunTsun(user, buddy, word, buddyItem, 10L, today);
         ReflectionTestUtils.setField(sentOnly, "id", 41L);
         given(tsunTsunRepository.findPairByTargetDate(1L, 2L, today)).willReturn(List.of(sentOnly));
         given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDateAndStatus(1L, 2L, today, TsunTsunStatus.ANSWERED)).willReturn(0L);
@@ -488,11 +518,11 @@ class TsunTsunServiceTest {
         given(buddyItem2.getId()).willReturn(42L);
         given(buddyItem2.getWord()).willReturn(word2);
 
-        TsunTsun answeredSent = TsunTsun.sent(user, buddy, word1, buddyItem1, today);
+        TsunTsun answeredSent = testTsunTsun(user, buddy, word1, buddyItem1, 10L, today);
         answeredSent.markAnswered();
-        TsunTsun answeredReceived = TsunTsun.sent(buddy, user, word2, buddyItem2, today);
+        TsunTsun answeredReceived = testTsunTsun(buddy, user, word2, buddyItem2, 10L, today);
         answeredReceived.markAnswered();
-        TsunTsun pendingReceived = TsunTsun.sent(buddy, user, word1, buddyItem1, today);
+        TsunTsun pendingReceived = testTsunTsun(buddy, user, word1, buddyItem1, 10L, today);
 
         given(tsunTsunRepository.findPairByTargetDate(1L, 2L, today))
                 .willReturn(List.of(answeredSent, answeredReceived, pendingReceived));

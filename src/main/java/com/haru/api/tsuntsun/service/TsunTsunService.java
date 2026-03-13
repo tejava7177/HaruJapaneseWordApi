@@ -1,6 +1,8 @@
 package com.haru.api.tsuntsun.service;
 
 import com.haru.api.buddy.domain.BuddyStatus;
+import com.haru.api.buddy.domain.BuddyRelationship;
+import com.haru.api.buddy.domain.Buddy;
 import com.haru.api.buddy.repository.BuddyRepository;
 import com.haru.api.dailyword.domain.DailyWordItem;
 import com.haru.api.dailyword.domain.DailyWordSet;
@@ -73,7 +75,8 @@ public class TsunTsunService {
         User receiver = userRepository.findById(receiverId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + receiverId));
 
-        validateBuddyRelation(senderId, receiverId);
+        Buddy buddy = getActiveBuddy(senderId, receiverId);
+        validateBuddyRelation(buddy, receiverId, senderId);
 
         LocalDate today = LocalDate.now();
 
@@ -127,7 +130,8 @@ public class TsunTsunService {
         }
 
         Word word = dailyWordItem.getWord();
-        TsunTsun saved = tsunTsunRepository.save(TsunTsun.sent(sender, receiver, word, dailyWordItem, today));
+        BuddyRelationship buddyRelationship = buddy.getBuddyRelationship();
+        TsunTsun saved = tsunTsunRepository.save(TsunTsun.sent(sender, receiver, word, dailyWordItem, buddyRelationship, today));
 
         log.info("[tsuntsun/send] send created: tsuntsunId={}, senderId={}, receiverId={}, targetDate={}",
                 saved.getId(), senderId, receiverId, today);
@@ -351,10 +355,16 @@ public class TsunTsunService {
         return progressCount;
     }
 
-    private void validateBuddyRelation(Long userId, Long buddyId) {
-        if (!hasActiveBuddyRelation(userId, buddyId)) {
+    private void validateBuddyRelation(Buddy buddy, Long buddyId, Long userId) {
+        boolean reverseConnected = buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(buddyId, userId, BuddyStatus.ACTIVE);
+        if (buddy == null || !reverseConnected) {
             throw missingBuddyRelation(userId, buddyId);
         }
+    }
+
+    private Buddy getActiveBuddy(Long userId, Long buddyId) {
+        return buddyRepository.findByUserIdAndBuddyUserIdAndStatus(userId, buddyId, BuddyStatus.ACTIVE)
+                .orElseThrow(() -> missingBuddyRelation(userId, buddyId));
     }
 
     private boolean hasActiveBuddyRelation(Long userId, Long buddyId) {

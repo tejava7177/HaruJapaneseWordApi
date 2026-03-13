@@ -8,15 +8,17 @@ public record BuddyResponse(
         Long userId,
         Long buddyUserId,
         String buddyNickname,
-        BuddyStatus status
+        BuddyStatus status,
+        Long tikiTakaCount
 ) {
-    public static BuddyResponse from(Buddy buddy) {
+    public static BuddyResponse from(Buddy buddy, long tikiTakaCount) {
         return new BuddyResponse(
                 buddy.getId(),
                 buddy.getUser().getId(),
                 buddy.getBuddyUser().getId(),
                 buddy.getBuddyUser().getNickname(),
-                buddy.getStatus()
+                buddy.getStatus(),
+                tikiTakaCount
         );
     }
 }
