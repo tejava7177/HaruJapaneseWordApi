@@ -6,6 +6,7 @@ import static org.mockito.BDDMockito.given;
 
 import com.haru.api.user.domain.User;
 import com.haru.api.user.dto.UpdateLearningLevelResponse;
+import com.haru.api.user.dto.UserBuddyCodeResponse;
 import com.haru.api.user.repository.UserRepository;
 import com.haru.api.word.domain.WordLevel;
 import java.util.Optional;
@@ -50,5 +51,25 @@ class UserServiceTest {
         assertThatThrownBy(() -> userService.updateLearningLevel(99L, WordLevel.N2))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("User not found: 99");
+    }
+
+    @Test
+    void getBuddyCode_returnsExistingBuddyCode() {
+        User user = new User(1L, "juheun", WordLevel.N4, "JUHEUN01");
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+
+        UserBuddyCodeResponse response = userService.getBuddyCode(1L);
+
+        assertThat(response.userId()).isEqualTo(1L);
+        assertThat(response.buddyCode()).isEqualTo("JUHEUN01");
+    }
+
+    @Test
+    void getBuddyCode_failsWhenUserMissing() {
+        given(userRepository.findById(999L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.getBuddyCode(999L))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("User not found: 999");
     }
 }

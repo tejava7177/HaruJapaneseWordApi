@@ -2,6 +2,7 @@ package com.haru.api.user.init;
 
 import com.haru.api.user.domain.User;
 import com.haru.api.user.repository.UserRepository;
+import com.haru.api.user.service.BuddyCodeService;
 import com.haru.api.word.domain.WordLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,7 +17,10 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class UserDataInitializer implements CommandLineRunner {
 
+    private static final String DEFAULT_PROFILE_IMAGE_URL = null;
+
     private final UserRepository userRepository;
+    private final BuddyCodeService buddyCodeService;
 
     @Override
     @Transactional
@@ -28,12 +32,13 @@ public class UserDataInitializer implements CommandLineRunner {
     }
 
     private void upsertTestUser(Long id, String nickname, String buddyCode) {
+        String resolvedBuddyCode = buddyCode != null ? buddyCode : buddyCodeService.generateUniqueBuddyCode();
         User desired = new User(
                 id,
                 nickname,
                 WordLevel.N4,
-                buddyCode,
-                null,
+                resolvedBuddyCode,
+                DEFAULT_PROFILE_IMAGE_URL,
                 "@" + nickname,
                 nickname + "와(과) 같이 일본어 공부해요",
                 false
@@ -42,15 +47,15 @@ public class UserDataInitializer implements CommandLineRunner {
         userRepository.findById(id)
                 .ifPresentOrElse(existing -> {
                     if (sameUser(existing, desired)) {
-                        log.info("[init] test user ready: id={}, nickname={}, buddyCode={}", id, nickname, buddyCode);
+                        log.info("[init] test user ready: id={}, nickname={}, buddyCode={}", id, nickname, resolvedBuddyCode);
                         return;
                     }
 
                     userRepository.save(desired);
-                    log.info("[init] test user updated: id={}, nickname={}, buddyCode={}", id, nickname, buddyCode);
+                    log.info("[init] test user updated: id={}, nickname={}, buddyCode={}", id, nickname, resolvedBuddyCode);
                 }, () -> {
                     userRepository.save(desired);
-                    log.info("[init] test user created: id={}, nickname={}, buddyCode={}", id, nickname, buddyCode);
+                    log.info("[init] test user created: id={}, nickname={}, buddyCode={}", id, nickname, resolvedBuddyCode);
                 });
     }
 

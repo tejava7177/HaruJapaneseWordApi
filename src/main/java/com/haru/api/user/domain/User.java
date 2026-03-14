@@ -8,7 +8,6 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
-import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -50,7 +49,7 @@ public class User {
     private LocalDateTime updatedAt;
 
     public User(Long id, String nickname, WordLevel learningLevel) {
-        this(id, nickname, learningLevel, generateBuddyCode(), null, null, null, false);
+        this(id, nickname, learningLevel, null, null, null, null, false);
     }
 
     public User(Long id, String nickname, WordLevel learningLevel, String buddyCode) {
@@ -83,9 +82,5 @@ public class User {
 
     public void changeRandomMatchingEnabled(boolean randomMatchingEnabled) {
         this.randomMatchingEnabled = randomMatchingEnabled;
-    }
-
-    private static String generateBuddyCode() {
-        return UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
     }
 }

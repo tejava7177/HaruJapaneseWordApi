@@ -3,6 +3,7 @@ package com.haru.api.user.service;
 import com.haru.api.user.domain.User;
 import com.haru.api.user.dto.UpdateLearningLevelResponse;
 import com.haru.api.user.dto.UpdateRandomMatchingResponse;
+import com.haru.api.user.dto.UserBuddyCodeResponse;
 import com.haru.api.user.repository.UserRepository;
 import com.haru.api.word.domain.WordLevel;
 import lombok.RequiredArgsConstructor;
@@ -34,5 +35,12 @@ public class UserService {
 
         user.changeRandomMatchingEnabled(enabled);
         return UpdateRandomMatchingResponse.from(user);
+    }
+
+    public UserBuddyCodeResponse getBuddyCode(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId));
+
+        return UserBuddyCodeResponse.from(user);
     }
 }
