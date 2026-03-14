@@ -20,6 +20,14 @@ public interface BuddyRepository extends JpaRepository<Buddy, Long> {
     Optional<Buddy> findByUserIdAndBuddyUserIdAndStatus(Long userId, Long buddyUserId, BuddyStatus status);
 
     @Query("""
+            select b.buddyUser.id
+            from Buddy b
+            where b.user.id = :userId
+              and b.status = :status
+            """)
+    List<Long> findBuddyUserIdsByUserIdAndStatus(Long userId, BuddyStatus status);
+
+    @Query("""
             select count(b)
             from Buddy b
             left join b.buddyRelationship br

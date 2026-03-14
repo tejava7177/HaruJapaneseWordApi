@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.haru.api.user.dto.UpdateLearningLevelResponse;
+import com.haru.api.user.dto.UpdateRandomMatchingResponse;
 import com.haru.api.user.service.UserService;
 import com.haru.api.word.domain.WordLevel;
 import org.junit.jupiter.api.Test;
@@ -53,5 +54,20 @@ class UserControllerTest {
                                 {"learningLevel":"NX"}
                                 """))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void updateRandomMatching_returnsUpdatedUser() throws Exception {
+        UpdateRandomMatchingResponse response = new UpdateRandomMatchingResponse(4L, true);
+        given(userService.updateRandomMatchingEnabled(4L, true)).willReturn(response);
+
+        mockMvc.perform(patch("/api/users/4/random-matching")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"enabled":true}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(4))
+                .andExpect(jsonPath("$.randomMatchingEnabled").value(true));
     }
 }

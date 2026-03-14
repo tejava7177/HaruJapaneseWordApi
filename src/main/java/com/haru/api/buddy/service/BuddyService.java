@@ -4,13 +4,18 @@ import com.haru.api.buddy.domain.Buddy;
 import com.haru.api.buddy.domain.BuddyRelationship;
 import com.haru.api.buddy.domain.BuddyStatus;
 import com.haru.api.buddy.dto.BuddyResponse;
+import com.haru.api.buddy.dto.DeleteBuddyResponse;
+import com.haru.api.buddy.dto.RandomMatchingCandidateResponse;
 import com.haru.api.buddy.repository.BuddyRelationshipRepository;
+import com.haru.api.buddy.repository.BuddyRequestRepository;
 import com.haru.api.buddy.repository.BuddyRepository;
 import com.haru.api.tsuntsun.domain.TsunTsunStatus;
 import com.haru.api.tsuntsun.repository.TsunTsunRepository;
 import com.haru.api.user.domain.User;
 import com.haru.api.user.repository.UserRepository;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -26,6 +31,7 @@ public class BuddyService {
 
     private final BuddyRelationshipRepository buddyRelationshipRepository;
     private final BuddyRepository buddyRepository;
+    private final BuddyRequestRepository buddyRequestRepository;
     private final TsunTsunRepository tsunTsunRepository;
     private final UserRepository userRepository;
 
@@ -59,7 +65,47 @@ public class BuddyService {
         return connectUsers(user, buddyUser);
     }
 
-    private BuddyResponse connectUsers(User user, User buddyUser) {
+    @Transactional
+    public DeleteBuddyResponse removeBuddy(Long userId, Long buddyUserId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId));
+        User buddyUser = userRepository.findById(buddyUserId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + buddyUserId));
+
+        Buddy userToBuddy = buddyRepository.findByUserIdAndBuddyUserIdAndStatus(user.getId(), buddyUser.getId(), BuddyStatus.ACTIVE)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "삭제할 활성 버디 관계가 없습니다."));
+        Buddy buddyToUser = buddyRepository.findByUserIdAndBuddyUserIdAndStatus(buddyUser.getId(), user.getId(), BuddyStatus.ACTIVE)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "삭제할 활성 버디 관계가 없습니다."));
+
+        buddyRepository.deleteAll(List.of(userToBuddy, buddyToUser));
+        return DeleteBuddyResponse.success(userId, buddyUserId);
+    }
+
+    public List<RandomMatchingCandidateResponse> getRandomCandidates(Long userId) {
+        userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId));
+
+        Set<Long> excludedUserIds = new HashSet<>();
+        excludedUserIds.add(userId);
+        excludedUserIds.addAll(buddyRepository.findBuddyUserIdsByUserIdAndStatus(userId, BuddyStatus.ACTIVE));
+        excludedUserIds.addAll(buddyRequestRepository.findTargetUserIdsByRequesterIdAndStatus(
+                userId, com.haru.api.buddy.domain.BuddyRequestStatus.PENDING
+        ));
+        excludedUserIds.addAll(buddyRequestRepository.findTargetUserIdsByRequesterIdAndStatus(
+                userId, com.haru.api.buddy.domain.BuddyRequestStatus.REJECTED
+        ));
+
+        // TODO: 2차에서는 같은 레벨 우선, 없으면 인접 레벨까지 허용하는 정책으로 확장한다.
+        return userRepository.findByRandomMatchingEnabledTrueOrderByIdAsc()
+                .stream()
+                .filter(candidate -> !excludedUserIds.contains(candidate.getId()))
+                .filter(candidate -> buddyRepository.countByUserIdAndStatus(candidate.getId(), BuddyStatus.ACTIVE) < MAX_BUDDY_COUNT)
+                .map(RandomMatchingCandidateResponse::from)
+                .toList();
+    }
+
+    @Transactional
+    public BuddyResponse connectUsers(User user, User buddyUser) {
         if (user.getId().equals(buddyUser.getId())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "자기 자신의 buddyCode로는 연결할 수 없습니다.");
         }
@@ -72,6 +118,7 @@ public class BuddyService {
         validateBuddyLimit(user.getId());
         validateBuddyLimit(buddyUser.getId());
 
+        // Reconnect must always start from a new relationship so past tiki-taka history is not reused.
         BuddyRelationship buddyRelationship = buddyRelationshipRepository.saveAndFlush(BuddyRelationship.create());
         Long relationshipId = buddyRelationship.getId();
         if (relationshipId == null) {
@@ -115,6 +162,10 @@ public class BuddyService {
         if (currentBuddyCount >= MAX_BUDDY_COUNT) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "한 사용자는 최대 3명의 버디만 연결할 수 있습니다.");
         }
+    }
+
+    public void validateBuddyLimitAvailable(Long userId) {
+        validateBuddyLimit(userId);
     }
 
     private void ensureUserExists(Long userId) {

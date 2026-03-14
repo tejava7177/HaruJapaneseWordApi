@@ -28,7 +28,16 @@ public class UserDataInitializer implements CommandLineRunner {
     }
 
     private void upsertTestUser(Long id, String nickname, String buddyCode) {
-        User desired = new User(id, nickname, WordLevel.N4, buddyCode);
+        User desired = new User(
+                id,
+                nickname,
+                WordLevel.N4,
+                buddyCode,
+                null,
+                "@" + nickname,
+                nickname + "와(과) 같이 일본어 공부해요",
+                false
+        );
 
         userRepository.findById(id)
                 .ifPresentOrElse(existing -> {
@@ -48,6 +57,9 @@ public class UserDataInitializer implements CommandLineRunner {
     private boolean sameUser(User existing, User desired) {
         return existing.getNickname().equals(desired.getNickname())
                 && existing.getLearningLevel() == desired.getLearningLevel()
-                && existing.getBuddyCode().equals(desired.getBuddyCode());
+                && existing.getBuddyCode().equals(desired.getBuddyCode())
+                && java.util.Objects.equals(existing.getInstagramId(), desired.getInstagramId())
+                && java.util.Objects.equals(existing.getBio(), desired.getBio())
+                && existing.isRandomMatchingEnabled() == desired.isRandomMatchingEnabled();
     }
 }
