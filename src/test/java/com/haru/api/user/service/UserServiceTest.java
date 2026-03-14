@@ -7,6 +7,7 @@ import static org.mockito.BDDMockito.given;
 import com.haru.api.user.domain.User;
 import com.haru.api.user.dto.UpdateLearningLevelResponse;
 import com.haru.api.user.dto.UserBuddyCodeResponse;
+import com.haru.api.user.dto.UserProfileResponse;
 import com.haru.api.user.repository.UserRepository;
 import com.haru.api.word.domain.WordLevel;
 import java.util.Optional;
@@ -69,6 +70,31 @@ class UserServiceTest {
         given(userRepository.findById(999L)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> userService.getBuddyCode(999L))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("User not found: 999");
+    }
+
+    @Test
+    void getUserProfile_returnsUserProfile() {
+        User user = new User(2L, "김민성", WordLevel.N2, "8TR4XK6N", null, "@minsung_jp", "매일 한 문장씩 일본어 연습 중", true);
+        given(userRepository.findById(2L)).willReturn(Optional.of(user));
+
+        UserProfileResponse response = userService.getUserProfile(2L);
+
+        assertThat(response.userId()).isEqualTo(2L);
+        assertThat(response.nickname()).isEqualTo("김민성");
+        assertThat(response.learningLevel()).isEqualTo(WordLevel.N2);
+        assertThat(response.bio()).isEqualTo("매일 한 문장씩 일본어 연습 중");
+        assertThat(response.instagramId()).isEqualTo("@minsung_jp");
+        assertThat(response.buddyCode()).isEqualTo("8TR4XK6N");
+        assertThat(response.randomMatchingEnabled()).isTrue();
+    }
+
+    @Test
+    void getUserProfile_failsWhenUserMissing() {
+        given(userRepository.findById(999L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.getUserProfile(999L))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("User not found: 999");
     }

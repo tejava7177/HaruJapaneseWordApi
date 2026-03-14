@@ -5,6 +5,7 @@ import com.haru.api.user.dto.UpdateLearningLevelResponse;
 import com.haru.api.user.dto.UpdateRandomMatchingRequest;
 import com.haru.api.user.dto.UpdateRandomMatchingResponse;
 import com.haru.api.user.dto.UserBuddyCodeResponse;
+import com.haru.api.user.dto.UserProfileResponse;
 import com.haru.api.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,6 +25,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
     private final UserService userService;
+
+    @GetMapping("/{userId}")
+    @Operation(summary = "사용자 프로필 조회")
+    public UserProfileResponse getUserProfile(@PathVariable Long userId) {
+        return userService.getUserProfile(userId);
+    }
 
     @GetMapping("/{userId}/buddy-code")
     @Operation(summary = "현재 사용자 초대코드 조회")

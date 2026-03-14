@@ -4,6 +4,8 @@ import com.haru.api.user.domain.User;
 import com.haru.api.user.repository.UserRepository;
 import com.haru.api.user.service.BuddyCodeService;
 import com.haru.api.word.domain.WordLevel;
+import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -17,7 +19,12 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class UserDataInitializer implements CommandLineRunner {
 
-    private static final String DEFAULT_PROFILE_IMAGE_URL = null;
+    private static final List<SeedUserSpec> SEED_USERS = List.of(
+            new SeedUserSpec(1L, "심주흔", WordLevel.N3, "@simjuheun", "JLPT N3 같이 준비해요", "7H2KQ9MP", true),
+            new SeedUserSpec(2L, "김민성", WordLevel.N2, "@minsung_jp", "매일 한 문장씩 일본어 연습 중", "8TR4XK6N", true),
+            new SeedUserSpec(3L, "김기범", WordLevel.N4, "@gibeom_study", "초급 회화부터 같이 해요", "5NC7PW2H", false),
+            new SeedUserSpec(4L, "김정훈", WordLevel.N1, "@junghoon.nihongo", "고급 표현과 뉴스 일본어 좋아해요", "9LM3QV7R", true)
+    );
 
     private final UserRepository userRepository;
     private final BuddyCodeService buddyCodeService;
@@ -25,37 +32,54 @@ public class UserDataInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        upsertTestUser(1L, "juheun", "JUHEUN01");
-        upsertTestUser(2L, "buddy2", "BUDDY002");
-        upsertTestUser(3L, "buddy3", "BUDDY003");
-        upsertTestUser(4L, "buddy4", "BUDDY004");
+        seedUsers();
     }
 
-    private void upsertTestUser(Long id, String nickname, String buddyCode) {
-        String resolvedBuddyCode = buddyCode != null ? buddyCode : buddyCodeService.generateUniqueBuddyCode();
+    @Transactional
+    public List<User> seedUsers() {
+        return SEED_USERS.stream()
+                .map(this::upsertSeedUser)
+                .toList();
+    }
+
+    public int seedUserCount() {
+        return SEED_USERS.size();
+    }
+
+    private User upsertSeedUser(SeedUserSpec seedUserSpec) {
+        String resolvedBuddyCode = seedUserSpec.buddyCode() != null
+                ? seedUserSpec.buddyCode()
+                : buddyCodeService.generateUniqueBuddyCode();
+
         User desired = new User(
-                id,
-                nickname,
-                WordLevel.N4,
+                seedUserSpec.id(),
+                seedUserSpec.nickname(),
+                seedUserSpec.learningLevel(),
                 resolvedBuddyCode,
-                DEFAULT_PROFILE_IMAGE_URL,
-                "@" + nickname,
-                nickname + "와(과) 같이 일본어 공부해요",
-                false
+                null,
+                seedUserSpec.instagramId(),
+                seedUserSpec.bio(),
+                seedUserSpec.randomMatchingEnabled()
         );
 
-        userRepository.findById(id)
-                .ifPresentOrElse(existing -> {
+        return userRepository.findById(seedUserSpec.id())
+                .map(existing -> {
                     if (sameUser(existing, desired)) {
-                        log.info("[init] test user ready: id={}, nickname={}, buddyCode={}", id, nickname, resolvedBuddyCode);
-                        return;
+                        log.info("[init] test user ready: id={}, nickname={}, buddyCode={}",
+                                seedUserSpec.id(), seedUserSpec.nickname(), resolvedBuddyCode);
+                        return existing;
                     }
 
-                    userRepository.save(desired);
-                    log.info("[init] test user updated: id={}, nickname={}, buddyCode={}", id, nickname, resolvedBuddyCode);
-                }, () -> {
-                    userRepository.save(desired);
-                    log.info("[init] test user created: id={}, nickname={}, buddyCode={}", id, nickname, resolvedBuddyCode);
+                    User savedUser = userRepository.save(desired);
+                    log.info("[init] test user updated: id={}, nickname={}, buddyCode={}",
+                            seedUserSpec.id(), seedUserSpec.nickname(), resolvedBuddyCode);
+                    return savedUser;
+                })
+                .orElseGet(() -> {
+                    User savedUser = userRepository.save(desired);
+                    log.info("[init] test user created: id={}, nickname={}, buddyCode={}",
+                            seedUserSpec.id(), seedUserSpec.nickname(), resolvedBuddyCode);
+                    return savedUser;
                 });
     }
 
@@ -63,8 +87,19 @@ public class UserDataInitializer implements CommandLineRunner {
         return existing.getNickname().equals(desired.getNickname())
                 && existing.getLearningLevel() == desired.getLearningLevel()
                 && existing.getBuddyCode().equals(desired.getBuddyCode())
-                && java.util.Objects.equals(existing.getInstagramId(), desired.getInstagramId())
-                && java.util.Objects.equals(existing.getBio(), desired.getBio())
+                && Objects.equals(existing.getInstagramId(), desired.getInstagramId())
+                && Objects.equals(existing.getBio(), desired.getBio())
                 && existing.isRandomMatchingEnabled() == desired.isRandomMatchingEnabled();
+    }
+
+    private record SeedUserSpec(
+            Long id,
+            String nickname,
+            WordLevel learningLevel,
+            String instagramId,
+            String bio,
+            String buddyCode,
+            boolean randomMatchingEnabled
+    ) {
     }
 }

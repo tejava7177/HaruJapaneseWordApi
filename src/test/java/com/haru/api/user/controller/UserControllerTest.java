@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.haru.api.user.dto.UpdateLearningLevelResponse;
 import com.haru.api.user.dto.UpdateRandomMatchingResponse;
 import com.haru.api.user.dto.UserBuddyCodeResponse;
+import com.haru.api.user.dto.UserProfileResponse;
 import com.haru.api.user.service.UserService;
 import com.haru.api.word.domain.WordLevel;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,39 @@ class UserControllerTest {
 
     @MockBean
     private UserService userService;
+
+    @Test
+    void getUserProfile_returnsProfile() throws Exception {
+        UserProfileResponse response = new UserProfileResponse(
+                2L,
+                "김민성",
+                WordLevel.N2,
+                "매일 한 문장씩 일본어 연습 중",
+                "@minsung_jp",
+                "8TR4XK6N",
+                true
+        );
+        given(userService.getUserProfile(2L)).willReturn(response);
+
+        mockMvc.perform(get("/api/users/2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(2))
+                .andExpect(jsonPath("$.nickname").value("김민성"))
+                .andExpect(jsonPath("$.learningLevel").value("N2"))
+                .andExpect(jsonPath("$.bio").value("매일 한 문장씩 일본어 연습 중"))
+                .andExpect(jsonPath("$.instagramId").value("@minsung_jp"))
+                .andExpect(jsonPath("$.buddyCode").value("8TR4XK6N"))
+                .andExpect(jsonPath("$.randomMatchingEnabled").value(true));
+    }
+
+    @Test
+    void getUserProfile_returnsNotFoundWhenUserMissing() throws Exception {
+        given(userService.getUserProfile(999L))
+                .willThrow(new ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "User not found: 999"));
+
+        mockMvc.perform(get("/api/users/999"))
+                .andExpect(status().isNotFound());
+    }
 
     @Test
     void getBuddyCode_returnsBuddyCode() throws Exception {
