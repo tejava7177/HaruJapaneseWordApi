@@ -44,5 +44,40 @@ public class BuddyRelationshipIntegrityLogger implements CommandLineRunner {
                 invalidTsunTsunRelationshipIds,
                 buddyRepository.countWithMissingRelationship(),
                 tsunTsunRepository.countWithMissingRelationship());
+
+        Long acceptedRequestsWithoutBuddyCount = jdbcTemplate.queryForObject("""
+                select count(*)
+                from buddy_request br
+                where br.status = 'ACCEPTED'
+                  and not exists (
+                      select 1
+                      from buddy b
+                      where (b.user_id = br.requester_id and b.buddy_user_id = br.target_user_id)
+                         or (b.user_id = br.target_user_id and b.buddy_user_id = br.requester_id)
+                  )
+                """, Long.class);
+
+        log.info("[BuddyRequest] startup integrity acceptedWithoutBuddyCount={}", acceptedRequestsWithoutBuddyCount);
+
+        if (acceptedRequestsWithoutBuddyCount != null && acceptedRequestsWithoutBuddyCount > 0) {
+            jdbcTemplate.queryForList("""
+                    select br.id, br.requester_id, br.target_user_id, br.responded_at
+                    from buddy_request br
+                    where br.status = 'ACCEPTED'
+                      and not exists (
+                          select 1
+                          from buddy b
+                          where (b.user_id = br.requester_id and b.buddy_user_id = br.target_user_id)
+                             or (b.user_id = br.target_user_id and b.buddy_user_id = br.requester_id)
+                      )
+                    order by br.id asc
+                    """).forEach(row -> log.warn(
+                    "[BuddyRequest] integrity issue accepted request without buddy requestId={} requester={} target={} respondedAt={}",
+                    row.get("id"),
+                    row.get("requester_id"),
+                    row.get("target_user_id"),
+                    row.get("responded_at")
+            ));
+        }
     }
 }

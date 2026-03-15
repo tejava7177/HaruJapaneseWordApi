@@ -130,7 +130,7 @@ public class BuddyService {
         );
         Buddy userToBuddy = Buddy.active(user, buddyUser, buddyRelationship);
         Buddy buddyToUser = Buddy.active(buddyUser, user, buddyRelationship);
-        buddyRepository.saveAll(List.of(userToBuddy, buddyToUser));
+        buddyRepository.saveAllAndFlush(List.of(userToBuddy, buddyToUser));
         org.slf4j.LoggerFactory.getLogger(BuddyService.class).info(
                 "[buddy/relationship] linked relationship to buddy rows: relationshipId={}, userId={}, buddyUserId={}",
                 relationshipId, user.getId(), buddyUser.getId()

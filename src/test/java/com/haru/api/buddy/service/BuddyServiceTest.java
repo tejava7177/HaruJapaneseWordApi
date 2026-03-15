@@ -75,7 +75,7 @@ class BuddyServiceTest {
         BuddyRelationship relationship = BuddyRelationship.create();
         ReflectionTestUtils.setField(relationship, "id", 10L);
         given(buddyRelationshipRepository.saveAndFlush(any(BuddyRelationship.class))).willReturn(relationship);
-        given(buddyRepository.saveAll(any())).willAnswer(invocation -> invocation.getArgument(0));
+        given(buddyRepository.saveAllAndFlush(any())).willAnswer(invocation -> invocation.getArgument(0));
 
         BuddyResponse response = buddyService.connectByBuddyCode(1L, "BBBB2222");
 
@@ -101,7 +101,7 @@ class BuddyServiceTest {
         given(buddyRepository.countByUserIdAndStatus(1L, BuddyStatus.ACTIVE)).willReturn(0L);
         given(buddyRepository.countByUserIdAndStatus(2L, BuddyStatus.ACTIVE)).willReturn(0L);
         given(buddyRelationshipRepository.saveAndFlush(any(BuddyRelationship.class))).willReturn(relationship);
-        given(buddyRepository.saveAll(any())).willReturn(List.of(userToBuddy));
+        given(buddyRepository.saveAllAndFlush(any())).willReturn(List.of(userToBuddy));
         given(userRepository.existsById(1L)).willReturn(true);
         given(buddyRepository.findByUserIdAndStatusOrderByCreatedAtAsc(1L, BuddyStatus.ACTIVE)).willReturn(List.of(userToBuddy));
         given(tsunTsunRepository.countByBuddyRelationshipIdAndSenderIdAndReceiverIdAndStatus(
@@ -254,7 +254,7 @@ class BuddyServiceTest {
         given(buddyRepository.countByUserIdAndStatus(1L, BuddyStatus.ACTIVE)).willReturn(0L);
         given(buddyRepository.countByUserIdAndStatus(2L, BuddyStatus.ACTIVE)).willReturn(0L);
         given(buddyRelationshipRepository.saveAndFlush(any(BuddyRelationship.class))).willReturn(newRelationship);
-        given(buddyRepository.saveAll(any())).willReturn(List.of(reconnected));
+        given(buddyRepository.saveAllAndFlush(any())).willReturn(List.of(reconnected));
 
         buddyService.removeBuddy(1L, 2L);
         BuddyResponse response = buddyService.connectByBuddyCode(1L, "BBBB2222");

@@ -54,31 +54,77 @@ public class BuddyRequestService {
 
     public java.util.List<IncomingBuddyRequestResponse> getIncomingRequests(Long userId) {
         ensureUserExists(userId);
-        return buddyRequestRepository.findByTargetUserIdOrderByCreatedAtDesc(userId)
+        log.info("[BuddyRequest] incoming userId={} statusFilter={}", userId, BuddyRequestStatus.PENDING);
+        java.util.List<IncomingBuddyRequestResponse> responses = buddyRequestRepository
+                .findByTargetUserIdAndStatusOrderByCreatedAtDesc(userId, BuddyRequestStatus.PENDING)
                 .stream()
                 .map(IncomingBuddyRequestResponse::from)
                 .toList();
+        log.info("[BuddyRequest] incoming result count={}", responses.size());
+        return responses;
     }
 
     public java.util.List<OutgoingBuddyRequestResponse> getOutgoingRequests(Long userId) {
         ensureUserExists(userId);
-        return buddyRequestRepository.findByRequesterIdOrderByCreatedAtDesc(userId)
+        log.info("[BuddyRequest] outgoing userId={} statusFilter={}", userId, BuddyRequestStatus.PENDING);
+        java.util.List<OutgoingBuddyRequestResponse> responses = buddyRequestRepository
+                .findByRequesterIdAndStatusOrderByCreatedAtDesc(userId, BuddyRequestStatus.PENDING)
                 .stream()
                 .map(OutgoingBuddyRequestResponse::from)
                 .toList();
+        log.info("[BuddyRequest] outgoing result count={}", responses.size());
+        return responses;
     }
 
     @Transactional
     public BuddyRequestActionResponse acceptRequest(Long requestId) {
+        log.info("[BuddyRequest] accept start requestId={}", requestId);
+
         BuddyRequest buddyRequest = buddyRequestRepository.findWithUsersById(requestId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Buddy request not found: " + requestId));
 
+        log.info("[BuddyRequest] request status before={}", buddyRequest.getStatus());
         if (buddyRequest.getStatus() != BuddyRequestStatus.PENDING) {
+            log.warn(
+                    "[BuddyRequest] accept rejected requestId={} reason=already processed status={}",
+                    requestId,
+                    buddyRequest.getStatus()
+            );
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미 처리된 버디 신청입니다.");
         }
 
-        buddyService.connectUsers(buddyRequest.getRequester(), buddyRequest.getTargetUser());
+        Long requesterId = buddyRequest.getRequester().getId();
+        Long targetUserId = buddyRequest.getTargetUser().getId();
+
+        try {
+            log.info("[BuddyRequest] creating buddy requester={} target={}", requesterId, targetUserId);
+            buddyService.connectUsers(buddyRequest.getRequester(), buddyRequest.getTargetUser());
+        } catch (RuntimeException exception) {
+            log.error(
+                    "[BuddyRequest] accept failed requestId={} stage=create buddy requester={} target={} message={}",
+                    requestId,
+                    requesterId,
+                    targetUserId,
+                    exception.getMessage(),
+                    exception
+            );
+            throw exception;
+        }
+
+        if (!hasActiveBuddyPair(requesterId, targetUserId)) {
+            log.error(
+                    "[BuddyRequest] accept failed requestId={} stage=verify buddy requester={} target={} message=missing buddy rows after connect",
+                    requestId,
+                    requesterId,
+                    targetUserId
+            );
+            throw new IllegalStateException("Buddy rows were not created for accepted request.");
+        }
+
+        log.info("[BuddyRequest] buddy rows created requester={}<->{}", requesterId, targetUserId);
         buddyRequest.accept();
+        log.info("[BuddyRequest] request status after={}", buddyRequest.getStatus());
+        log.info("[BuddyRequest] accept success requestId={}", requestId);
         return BuddyRequestActionResponse.from(buddyRequest);
     }
 
@@ -195,6 +241,11 @@ public class BuddyRequestService {
     private void rejectCreateRequest(Long requesterId, Long targetUserId, String reason, String message) {
         log.warn("[BuddyRequest] create rejected requester={} target={} reason={}", requesterId, targetUserId, reason);
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message);
+    }
+
+    private boolean hasActiveBuddyPair(Long requesterId, Long targetUserId) {
+        return buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(requesterId, targetUserId, BuddyStatus.ACTIVE)
+                && buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(targetUserId, requesterId, BuddyStatus.ACTIVE);
     }
 
     private void ensureUserExists(Long userId) {

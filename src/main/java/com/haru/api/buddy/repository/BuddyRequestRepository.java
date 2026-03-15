@@ -14,10 +14,10 @@ public interface BuddyRequestRepository extends JpaRepository<BuddyRequest, Long
     boolean existsByRequesterIdAndTargetUserIdAndStatus(Long requesterId, Long targetUserId, BuddyRequestStatus status);
 
     @EntityGraph(attributePaths = {"requester", "targetUser"})
-    List<BuddyRequest> findByTargetUserIdOrderByCreatedAtDesc(Long targetUserId);
+    List<BuddyRequest> findByTargetUserIdAndStatusOrderByCreatedAtDesc(Long targetUserId, BuddyRequestStatus status);
 
     @EntityGraph(attributePaths = {"requester", "targetUser"})
-    List<BuddyRequest> findByRequesterIdOrderByCreatedAtDesc(Long requesterId);
+    List<BuddyRequest> findByRequesterIdAndStatusOrderByCreatedAtDesc(Long requesterId, BuddyRequestStatus status);
 
     @EntityGraph(attributePaths = {"requester", "targetUser"})
     java.util.Optional<BuddyRequest> findWithUsersById(Long id);

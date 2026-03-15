@@ -8,10 +8,14 @@ import static org.mockito.Mockito.verify;
 
 import com.haru.api.buddy.domain.BuddyRequest;
 import com.haru.api.buddy.domain.BuddyRequestStatus;
+import com.haru.api.buddy.domain.BuddyRelationship;
+import com.haru.api.buddy.domain.BuddyStatus;
 import com.haru.api.buddy.dto.BuddyRequestActionResponse;
 import com.haru.api.buddy.dto.IncomingBuddyRequestResponse;
 import com.haru.api.buddy.repository.BuddyRequestRepository;
+import com.haru.api.buddy.repository.BuddyRelationshipRepository;
 import com.haru.api.buddy.repository.BuddyRepository;
+import com.haru.api.tsuntsun.repository.TsunTsunRepository;
 import com.haru.api.user.domain.User;
 import com.haru.api.user.repository.UserRepository;
 import com.haru.api.word.domain.WordLevel;
@@ -38,6 +42,12 @@ class BuddyRequestServiceTest {
 
     @Mock
     private BuddyService buddyService;
+
+    @Mock
+    private BuddyRelationshipRepository buddyRelationshipRepository;
+
+    @Mock
+    private TsunTsunRepository tsunTsunRepository;
 
     private BuddyRequestService buddyRequestService;
 
@@ -131,7 +141,8 @@ class BuddyRequestServiceTest {
         ReflectionTestUtils.setField(buddyRequest, "id", 10L);
 
         given(userRepository.existsById(2L)).willReturn(true);
-        given(buddyRequestRepository.findByTargetUserIdOrderByCreatedAtDesc(2L)).willReturn(List.of(buddyRequest));
+        given(buddyRequestRepository.findByTargetUserIdAndStatusOrderByCreatedAtDesc(2L, BuddyRequestStatus.PENDING))
+                .willReturn(List.of(buddyRequest));
 
         List<IncomingBuddyRequestResponse> responses = buddyRequestService.getIncomingRequests(2L);
 
@@ -142,19 +153,131 @@ class BuddyRequestServiceTest {
     }
 
     @Test
+    void getIncomingRequests_excludesAcceptedRequests() {
+        given(userRepository.existsById(2L)).willReturn(true);
+        given(buddyRequestRepository.findByTargetUserIdAndStatusOrderByCreatedAtDesc(2L, BuddyRequestStatus.PENDING))
+                .willReturn(List.of());
+
+        List<IncomingBuddyRequestResponse> responses = buddyRequestService.getIncomingRequests(2L);
+
+        assertThat(responses).isEmpty();
+    }
+
+    @Test
+    void getIncomingRequests_excludesRejectedRequests() {
+        given(userRepository.existsById(2L)).willReturn(true);
+        given(buddyRequestRepository.findByTargetUserIdAndStatusOrderByCreatedAtDesc(2L, BuddyRequestStatus.PENDING))
+                .willReturn(List.of());
+
+        List<IncomingBuddyRequestResponse> responses = buddyRequestService.getIncomingRequests(2L);
+
+        assertThat(responses).isEmpty();
+    }
+
+    @Test
+    void getOutgoingRequests_returnsPendingRequestsOnly() {
+        User requester = new User(2L, "requester", WordLevel.N4, "REQ00002", null, "@req", "bio", true);
+        User target = new User(3L, "target", WordLevel.N4, "TAR00003", null, "@target", "bio", true);
+        BuddyRequest buddyRequest = BuddyRequest.pending(requester, target);
+        ReflectionTestUtils.setField(buddyRequest, "id", 20L);
+
+        given(userRepository.existsById(2L)).willReturn(true);
+        given(buddyRequestRepository.findByRequesterIdAndStatusOrderByCreatedAtDesc(2L, BuddyRequestStatus.PENDING))
+                .willReturn(List.of(buddyRequest));
+
+        List<com.haru.api.buddy.dto.OutgoingBuddyRequestResponse> responses = buddyRequestService.getOutgoingRequests(2L);
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).requestId()).isEqualTo(20L);
+        assertThat(responses.get(0).targetUserId()).isEqualTo(3L);
+        assertThat(responses.get(0).status()).isEqualTo(BuddyRequestStatus.PENDING);
+    }
+
+    @Test
+    void getOutgoingRequests_excludesAcceptedRequests() {
+        given(userRepository.existsById(2L)).willReturn(true);
+        given(buddyRequestRepository.findByRequesterIdAndStatusOrderByCreatedAtDesc(2L, BuddyRequestStatus.PENDING))
+                .willReturn(List.of());
+
+        List<com.haru.api.buddy.dto.OutgoingBuddyRequestResponse> responses = buddyRequestService.getOutgoingRequests(2L);
+
+        assertThat(responses).isEmpty();
+    }
+
+    @Test
     void acceptRequest_createsBuddyConnectionAndChangesStatus() {
         User requester = new User(1L, "requester", WordLevel.N4, "REQ00001", null, "@req", "bio", true);
         User target = new User(2L, "target", WordLevel.N4, "TAR00001", null, "@target", "bio", true);
-        BuddyRequest buddyRequest = BuddyRequest.pending(requester, target);
-        ReflectionTestUtils.setField(buddyRequest, "id", 10L);
+        BuddyRequest buddyRequest = pendingRequest(10L, requester, target);
+        BuddyRelationship relationship = BuddyRelationship.create();
+        ReflectionTestUtils.setField(relationship, "id", 20L);
+        BuddyService realBuddyService = new BuddyService(
+                buddyRelationshipRepository,
+                buddyRepository,
+                buddyRequestRepository,
+                tsunTsunRepository,
+                userRepository
+        );
+        BuddyRequestService acceptService = new BuddyRequestService(
+                buddyRequestRepository,
+                buddyRepository,
+                userRepository,
+                realBuddyService
+        );
 
         given(buddyRequestRepository.findWithUsersById(10L)).willReturn(java.util.Optional.of(buddyRequest));
+        given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(1L, 2L, BuddyStatus.ACTIVE))
+                .willReturn(false, true);
+        given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(2L, 1L, BuddyStatus.ACTIVE))
+                .willReturn(false, true);
+        given(buddyRepository.countByUserIdAndStatus(1L, BuddyStatus.ACTIVE)).willReturn(0L);
+        given(buddyRepository.countByUserIdAndStatus(2L, BuddyStatus.ACTIVE)).willReturn(0L);
+        given(buddyRelationshipRepository.saveAndFlush(any(BuddyRelationship.class))).willReturn(relationship);
+        given(buddyRepository.saveAllAndFlush(any())).willAnswer(invocation -> invocation.getArgument(0));
 
-        BuddyRequestActionResponse response = buddyRequestService.acceptRequest(10L);
+        BuddyRequestActionResponse response = acceptService.acceptRequest(10L);
 
-        verify(buddyService).connectUsers(requester, target);
+        verify(buddyRepository).saveAllAndFlush(any());
         assertThat(response.requestId()).isEqualTo(10L);
         assertThat(response.status()).isEqualTo(BuddyRequestStatus.ACCEPTED);
+        assertThat(buddyRequest.getStatus()).isEqualTo(BuddyRequestStatus.ACCEPTED);
+        assertThat(buddyRequest.getRespondedAt()).isNotNull();
+    }
+
+    @Test
+    void acceptRequest_rollsBackStatusWhenBuddyCreationFails() {
+        User requester = new User(1L, "requester", WordLevel.N4, "REQ00001", null, "@req", "bio", true);
+        User target = new User(2L, "target", WordLevel.N4, "TAR00001", null, "@target", "bio", true);
+        BuddyRequest buddyRequest = pendingRequest(10L, requester, target);
+
+        given(buddyRequestRepository.findWithUsersById(10L)).willReturn(java.util.Optional.of(buddyRequest));
+        org.mockito.Mockito.doThrow(new IllegalStateException("buddy insert failed"))
+                .when(buddyService)
+                .connectUsers(requester, target);
+
+        assertThatThrownBy(() -> buddyRequestService.acceptRequest(10L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("buddy insert failed");
+
+        assertThat(buddyRequest.getStatus()).isEqualTo(BuddyRequestStatus.PENDING);
+        assertThat(buddyRequest.getRespondedAt()).isNull();
+    }
+
+    @Test
+    void acceptRequest_rejectsAcceptedStateWhenBuddyRowsAreMissingAfterConnect() {
+        User requester = new User(1L, "requester", WordLevel.N4, "REQ00001", null, "@req", "bio", true);
+        User target = new User(2L, "target", WordLevel.N4, "TAR00001", null, "@target", "bio", true);
+        BuddyRequest buddyRequest = pendingRequest(10L, requester, target);
+
+        given(buddyRequestRepository.findWithUsersById(10L)).willReturn(java.util.Optional.of(buddyRequest));
+        given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(1L, 2L, BuddyStatus.ACTIVE)).willReturn(false);
+
+        assertThatThrownBy(() -> buddyRequestService.acceptRequest(10L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Buddy rows were not created");
+
+        assertThat(buddyRequest.getStatus()).isEqualTo(BuddyRequestStatus.PENDING);
+        assertThat(buddyRequest.getRespondedAt()).isNull();
     }
 
     @Test
@@ -207,5 +330,11 @@ class BuddyRequestServiceTest {
         given(buddyRequestRepository.save(any(BuddyRequest.class))).willReturn(savedRequest);
 
         return buddyRequestService.createRequest(requester.getId(), target.getId());
+    }
+
+    private BuddyRequest pendingRequest(Long requestId, User requester, User target) {
+        BuddyRequest buddyRequest = BuddyRequest.pending(requester, target);
+        ReflectionTestUtils.setField(buddyRequest, "id", requestId);
+        return buddyRequest;
     }
 }
