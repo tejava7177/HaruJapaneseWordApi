@@ -7,20 +7,24 @@ import com.haru.api.buddy.dto.IncomingBuddyRequestResponse;
 import com.haru.api.buddy.dto.OutgoingBuddyRequestResponse;
 import com.haru.api.buddy.repository.BuddyRequestRepository;
 import com.haru.api.buddy.repository.BuddyRepository;
+import com.haru.api.buddy.domain.BuddyStatus;
 import com.haru.api.user.domain.User;
 import com.haru.api.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class BuddyRequestService {
 
     private static final int MAX_OUTGOING_PENDING_REQUEST_COUNT = 3;
+    private static final int MAX_BUDDY_COUNT = 3;
 
     private final BuddyRequestRepository buddyRequestRepository;
     private final BuddyRepository buddyRepository;
@@ -29,6 +33,8 @@ public class BuddyRequestService {
 
     @Transactional
     public BuddyRequestActionResponse createRequest(Long requesterId, Long targetUserId) {
+        log.info("[BuddyRequest] create start requester={} target={}", requesterId, targetUserId);
+
         User requester = userRepository.findById(requesterId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + requesterId));
         User targetUser = userRepository.findById(targetUserId)
@@ -37,6 +43,12 @@ public class BuddyRequestService {
         validateRequestCreation(requester, targetUser);
 
         BuddyRequest buddyRequest = buddyRequestRepository.save(BuddyRequest.pending(requester, targetUser));
+        log.info(
+                "[BuddyRequest] create success requester={} target={} requestId={}",
+                requesterId,
+                targetUserId,
+                buddyRequest.getId()
+        );
         return BuddyRequestActionResponse.from(buddyRequest);
     }
 
@@ -84,46 +96,105 @@ public class BuddyRequestService {
     }
 
     private void validateRequestCreation(User requester, User targetUser) {
-        if (requester.getId().equals(targetUser.getId())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "자기 자신에게는 버디 신청을 보낼 수 없습니다.");
+        boolean selfRequest = requester.getId().equals(targetUser.getId());
+        log.info("[BuddyRequest] validation selfRequest={}", selfRequest);
+        if (selfRequest) {
+            rejectCreateRequest(requester.getId(), targetUser.getId(), "self request", "자기 자신에게 신청할 수 없습니다.");
         }
 
-        if (requester.getLearningLevel() != targetUser.getLearningLevel()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "현재 1차 랜덤 매칭은 같은 학습 레벨 사용자에게만 신청할 수 있습니다.");
-        }
+        // TODO: 2차에서는 같은 레벨 우선, 인접 레벨 허용 정책으로 확장할 수 있다.
 
-        if (!targetUser.isRandomMatchingEnabled()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "상대방이 랜덤 매칭 노출을 비활성화했습니다.");
-        }
-
-        if (buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(
-                requester.getId(), targetUser.getId(), com.haru.api.buddy.domain.BuddyStatus.ACTIVE
-        )) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미 연결된 버디입니다.");
-        }
-
-        if (buddyRequestRepository.existsByRequesterIdAndTargetUserIdAndStatus(
-                requester.getId(), targetUser.getId(), BuddyRequestStatus.PENDING
-        )) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미 대기 중인 버디 신청입니다.");
-        }
-
-        if (buddyRequestRepository.existsByRequesterIdAndTargetUserIdAndStatus(
-                requester.getId(), targetUser.getId(), BuddyRequestStatus.REJECTED
-        )) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미 거절된 랜덤 매칭 신청입니다.");
-        }
-
-        if (buddyRequestRepository.countByRequesterIdAndStatus(requester.getId(), BuddyRequestStatus.PENDING)
-                >= MAX_OUTGOING_PENDING_REQUEST_COUNT) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "현재 대기 중인 버디 신청이 3개예요. 응답을 기다려주세요."
+        boolean targetRandomMatchingEnabled = targetUser.isRandomMatchingEnabled();
+        log.info("[BuddyRequest] validation targetRandomMatchingEnabled={}", targetRandomMatchingEnabled);
+        if (!targetRandomMatchingEnabled) {
+            rejectCreateRequest(
+                    requester.getId(),
+                    targetUser.getId(),
+                    "target random matching disabled",
+                    "상대가 랜덤 매칭 노출을 꺼두었습니다."
             );
         }
 
-        buddyService.validateBuddyLimitAvailable(requester.getId());
-        buddyService.validateBuddyLimitAvailable(targetUser.getId());
+        boolean alreadyBuddy = buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(
+                requester.getId(),
+                targetUser.getId(),
+                BuddyStatus.ACTIVE
+        ) || buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(
+                targetUser.getId(),
+                requester.getId(),
+                BuddyStatus.ACTIVE
+        );
+        log.info("[BuddyRequest] validation alreadyBuddy={}", alreadyBuddy);
+        if (alreadyBuddy) {
+            rejectCreateRequest(requester.getId(), targetUser.getId(), "already buddy", "이미 버디인 사용자입니다.");
+        }
+
+        boolean duplicatePending = buddyRequestRepository.existsByRequesterIdAndTargetUserIdAndStatus(
+                requester.getId(), targetUser.getId(), BuddyRequestStatus.PENDING
+        );
+        log.info("[BuddyRequest] validation duplicatePending={}", duplicatePending);
+        if (duplicatePending) {
+            rejectCreateRequest(
+                    requester.getId(),
+                    targetUser.getId(),
+                    "duplicate pending",
+                    "이미 대기 중인 버디 신청이 있습니다."
+            );
+        }
+
+        boolean rejectedHistory = buddyRequestRepository.existsByRequesterIdAndTargetUserIdAndStatus(
+                requester.getId(), targetUser.getId(), BuddyRequestStatus.REJECTED
+        );
+        log.info("[BuddyRequest] validation rejectedHistory={}", rejectedHistory);
+        if (rejectedHistory) {
+            rejectCreateRequest(
+                    requester.getId(),
+                    targetUser.getId(),
+                    "rejected history exists",
+                    "이미 거절된 버디 신청 이력이 있습니다."
+            );
+        }
+
+        long requesterBuddyCount = buddyRepository.countByUserIdAndStatus(requester.getId(), BuddyStatus.ACTIVE);
+        log.info("[BuddyRequest] validation requesterBuddyCount={}", requesterBuddyCount);
+        if (requesterBuddyCount >= MAX_BUDDY_COUNT) {
+            rejectCreateRequest(
+                    requester.getId(),
+                    targetUser.getId(),
+                    "requester buddy limit reached",
+                    "현재 버디 수가 가득 찼습니다. 기존 버디를 정리한 뒤 다시 시도해주세요."
+            );
+        }
+
+        long targetBuddyCount = buddyRepository.countByUserIdAndStatus(targetUser.getId(), BuddyStatus.ACTIVE);
+        log.info("[BuddyRequest] validation targetBuddyCount={}", targetBuddyCount);
+        if (targetBuddyCount >= MAX_BUDDY_COUNT) {
+            rejectCreateRequest(
+                    requester.getId(),
+                    targetUser.getId(),
+                    "target buddy limit reached",
+                    "상대의 버디 수가 가득 찼습니다."
+            );
+        }
+
+        long requesterPendingCount = buddyRequestRepository.countByRequesterIdAndStatus(
+                requester.getId(),
+                BuddyRequestStatus.PENDING
+        );
+        log.info("[BuddyRequest] validation requesterPendingCount={}", requesterPendingCount);
+        if (requesterPendingCount >= MAX_OUTGOING_PENDING_REQUEST_COUNT) {
+            rejectCreateRequest(
+                    requester.getId(),
+                    targetUser.getId(),
+                    "requester pending limit reached",
+                    "현재 대기 중인 버디 신청이 %d개예요. 응답을 기다려주세요.".formatted(requesterPendingCount)
+            );
+        }
+    }
+
+    private void rejectCreateRequest(Long requesterId, Long targetUserId, String reason, String message) {
+        log.warn("[BuddyRequest] create rejected requester={} target={} reason={}", requesterId, targetUserId, reason);
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message);
     }
 
     private void ensureUserExists(Long userId) {
