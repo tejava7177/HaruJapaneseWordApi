@@ -2,6 +2,7 @@ package com.haru.api.user.controller;
 
 import com.haru.api.user.dto.UpdateLearningLevelRequest;
 import com.haru.api.user.dto.UpdateLearningLevelResponse;
+import com.haru.api.user.dto.UpdateProfileImageResponse;
 import com.haru.api.user.dto.UpdateRandomMatchingRequest;
 import com.haru.api.user.dto.UpdateRandomMatchingResponse;
 import com.haru.api.user.dto.UserBuddyCodeResponse;
@@ -11,12 +12,16 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/users")
@@ -54,5 +59,14 @@ public class UserController {
             @Valid @RequestBody UpdateRandomMatchingRequest request
     ) {
         return userService.updateRandomMatchingEnabled(userId, request.enabled());
+    }
+
+    @PostMapping(value = "/{userId}/profile-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "프로필 사진 업로드")
+    public UpdateProfileImageResponse uploadProfileImage(
+            @PathVariable Long userId,
+            @RequestPart("file") MultipartFile file
+    ) {
+        return userService.uploadProfileImage(userId, file);
     }
 }

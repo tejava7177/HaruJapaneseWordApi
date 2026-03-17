@@ -6,6 +6,7 @@ import static org.mockito.BDDMockito.given;
 
 import com.haru.api.user.domain.User;
 import com.haru.api.user.dto.UpdateLearningLevelResponse;
+import com.haru.api.user.dto.UpdateProfileImageResponse;
 import com.haru.api.user.dto.UserBuddyCodeResponse;
 import com.haru.api.user.dto.UserProfileResponse;
 import com.haru.api.user.repository.UserRepository;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
@@ -24,11 +26,14 @@ class UserServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private ProfileImageStorageService profileImageStorageService;
+
     private UserService userService;
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(userRepository);
+        userService = new UserService(userRepository, profileImageStorageService);
     }
 
     @Test
@@ -76,7 +81,7 @@ class UserServiceTest {
 
     @Test
     void getUserProfile_returnsUserProfile() {
-        User user = new User(2L, "김민성", WordLevel.N2, "8TR4XK6N", null, "@minsung_jp", "매일 한 문장씩 일본어 연습 중", true);
+        User user = new User(2L, "김민성", WordLevel.N2, "8TR4XK6N", "https://cdn.haru.app/profiles/2.png", "@minsung_jp", "매일 한 문장씩 일본어 연습 중", true);
         given(userRepository.findById(2L)).willReturn(Optional.of(user));
 
         UserProfileResponse response = userService.getUserProfile(2L);
@@ -88,6 +93,57 @@ class UserServiceTest {
         assertThat(response.instagramId()).isEqualTo("@minsung_jp");
         assertThat(response.buddyCode()).isEqualTo("8TR4XK6N");
         assertThat(response.randomMatchingEnabled()).isTrue();
+        assertThat(response.profileImageUrl()).isEqualTo("https://cdn.haru.app/profiles/2.png");
+    }
+
+    @Test
+    void getUserProfile_returnsNullProfileImageUrlWhenProfileImageMissing() {
+        User user = new User(3L, "하루", WordLevel.N3, "HARU0003", null, "@haru_jp", "소개", false);
+        given(userRepository.findById(3L)).willReturn(Optional.of(user));
+
+        UserProfileResponse response = userService.getUserProfile(3L);
+
+        assertThat(response.userId()).isEqualTo(3L);
+        assertThat(response.profileImageUrl()).isNull();
+    }
+
+    @Test
+    void uploadProfileImage_updatesStoredProfileImageUrl() {
+        User user = new User(2L, "김민성", WordLevel.N2, "8TR4XK6N", null, "@minsung_jp", "매일 한 문장씩 일본어 연습 중", true);
+        given(userRepository.findById(2L)).willReturn(Optional.of(user));
+        MockMultipartFile file = new MockMultipartFile("file", "profile.png", "image/png", "image".getBytes());
+        given(profileImageStorageService.storeProfileImage(2L, file))
+                .willReturn("/uploads/profile/2-1234.png");
+
+        UpdateProfileImageResponse response =
+                userService.uploadProfileImage(2L, file);
+
+        assertThat(response.userId()).isEqualTo(2L);
+        assertThat(response.profileImageUrl()).isEqualTo("/uploads/profile/2-1234.png");
+        assertThat(user.getProfileImageUrl()).isEqualTo("/uploads/profile/2-1234.png");
+    }
+
+    @Test
+    void uploadProfileImage_failsWhenUserMissing() {
+        MockMultipartFile file = new MockMultipartFile("file", "profile.png", "image/png", "image".getBytes());
+        given(userRepository.findById(2L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.uploadProfileImage(2L, file))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("User not found: 2");
+    }
+
+    @Test
+    void uploadProfileImage_propagatesStorageFailure() {
+        User user = new User(2L, "김민성", WordLevel.N2, "8TR4XK6N", "https://cdn.haru.app/profiles/2.png", "@minsung_jp", "매일 한 문장씩 일본어 연습 중", true);
+        MockMultipartFile file = new MockMultipartFile("file", "profile.png", "image/png", "image".getBytes());
+        given(userRepository.findById(2L)).willReturn(Optional.of(user));
+        given(profileImageStorageService.storeProfileImage(2L, file))
+                .willThrow(new ResponseStatusException(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR, "Failed to store profile image"));
+
+        assertThatThrownBy(() -> userService.uploadProfileImage(2L, file))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Failed to store profile image");
     }
 
     @Test

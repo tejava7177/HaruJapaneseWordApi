@@ -6,6 +6,9 @@ server:
 app:
   seed:
     buddies: false
+  profile-image:
+    storage-path: ${user.dir}/uploads/profile
+    url-prefix: /uploads/profile
 
 spring:
   application:
@@ -27,3 +30,8 @@ spring:
   logging:
     level:
       org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping: TRACE
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB

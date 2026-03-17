@@ -70,7 +70,16 @@ public class UserDataInitializer implements CommandLineRunner {
                         return existing;
                     }
 
-                    User savedUser = userRepository.save(desired);
+                    User savedUser = userRepository.save(new User(
+                            desired.getId(),
+                            desired.getNickname(),
+                            desired.getLearningLevel(),
+                            desired.getBuddyCode(),
+                            existing.getProfileImageUrl(),
+                            desired.getInstagramId(),
+                            desired.getBio(),
+                            desired.isRandomMatchingEnabled()
+                    ));
                     log.info("[init] test user updated: id={}, nickname={}, buddyCode={}",
                             seedUserSpec.id(), seedUserSpec.nickname(), resolvedBuddyCode);
                     return savedUser;

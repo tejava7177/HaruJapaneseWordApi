@@ -83,4 +83,8 @@ public class User {
     public void changeRandomMatchingEnabled(boolean randomMatchingEnabled) {
         this.randomMatchingEnabled = randomMatchingEnabled;
     }
+
+    public void changeProfileImageUrl(String profileImageUrl) {
+        this.profileImageUrl = profileImageUrl;
+    }
 }

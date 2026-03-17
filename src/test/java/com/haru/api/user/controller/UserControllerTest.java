@@ -1,12 +1,16 @@
 package com.haru.api.user.controller;
 
 import static org.mockito.BDDMockito.given;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.haru.api.user.dto.UpdateLearningLevelResponse;
+import com.haru.api.user.dto.UpdateProfileImageResponse;
 import com.haru.api.user.dto.UpdateRandomMatchingResponse;
 import com.haru.api.user.dto.UserBuddyCodeResponse;
 import com.haru.api.user.dto.UserProfileResponse;
@@ -17,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -38,7 +43,8 @@ class UserControllerTest {
                 "매일 한 문장씩 일본어 연습 중",
                 "@minsung_jp",
                 "8TR4XK6N",
-                true
+                true,
+                "https://cdn.haru.app/profiles/2.png"
         );
         given(userService.getUserProfile(2L)).willReturn(response);
 
@@ -50,7 +56,28 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.bio").value("매일 한 문장씩 일본어 연습 중"))
                 .andExpect(jsonPath("$.instagramId").value("@minsung_jp"))
                 .andExpect(jsonPath("$.buddyCode").value("8TR4XK6N"))
-                .andExpect(jsonPath("$.randomMatchingEnabled").value(true));
+                .andExpect(jsonPath("$.randomMatchingEnabled").value(true))
+                .andExpect(jsonPath("$.profileImageUrl").value("https://cdn.haru.app/profiles/2.png"));
+    }
+
+    @Test
+    void getUserProfile_returnsNullProfileImageUrlWhenMissing() throws Exception {
+        UserProfileResponse response = new UserProfileResponse(
+                3L,
+                "하루",
+                WordLevel.N3,
+                "소개",
+                "@haru_jp",
+                "HARU0003",
+                false,
+                null
+        );
+        given(userService.getUserProfile(3L)).willReturn(response);
+
+        mockMvc.perform(get("/api/users/3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(3))
+                .andExpect(jsonPath("$.profileImageUrl").isEmpty());
     }
 
     @Test
@@ -126,5 +153,32 @@ class UserControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.userId").value(4))
                 .andExpect(jsonPath("$.randomMatchingEnabled").value(true));
+    }
+
+    @Test
+    void uploadProfileImage_returnsUpdatedProfileImageUrl() throws Exception {
+        UpdateProfileImageResponse response =
+                new UpdateProfileImageResponse(2L, "/uploads/profile/2-1234.png");
+        MockMultipartFile file =
+                new MockMultipartFile("file", "profile.png", "image/png", "image".getBytes());
+        given(userService.uploadProfileImage(eq(2L), any())).willReturn(response);
+
+        mockMvc.perform(multipart("/api/users/2/profile-image")
+                        .file(file))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(2))
+                .andExpect(jsonPath("$.profileImageUrl").value("/uploads/profile/2-1234.png"));
+    }
+
+    @Test
+    void uploadProfileImage_returnsNotFoundWhenUserMissing() throws Exception {
+        MockMultipartFile file =
+                new MockMultipartFile("file", "profile.png", "image/png", "image".getBytes());
+        given(userService.uploadProfileImage(eq(999L), any()))
+                .willThrow(new ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "User not found: 999"));
+
+        mockMvc.perform(multipart("/api/users/999/profile-image")
+                        .file(file))
+                .andExpect(status().isNotFound());
     }
 }

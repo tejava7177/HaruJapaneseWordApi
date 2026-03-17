@@ -10,7 +10,8 @@ public record UserProfileResponse(
         String bio,
         String instagramId,
         String buddyCode,
-        boolean randomMatchingEnabled
+        boolean randomMatchingEnabled,
+        String profileImageUrl
 ) {
     public static UserProfileResponse from(User user) {
         return new UserProfileResponse(
@@ -20,7 +21,8 @@ public record UserProfileResponse(
                 user.getBio(),
                 user.getInstagramId(),
                 user.getBuddyCode(),
-                user.isRandomMatchingEnabled()
+                user.isRandomMatchingEnabled(),
+                user.getProfileImageUrl()
         );
     }
 }
