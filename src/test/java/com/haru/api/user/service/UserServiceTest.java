@@ -3,6 +3,7 @@ package com.haru.api.user.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.ArgumentMatchers.any;
 
 import com.haru.api.user.domain.User;
 import com.haru.api.user.dto.UpdateLearningLevelResponse;
@@ -111,6 +112,7 @@ class UserServiceTest {
     void uploadProfileImage_updatesStoredProfileImageUrl() {
         User user = new User(2L, "김민성", WordLevel.N2, "8TR4XK6N", null, "@minsung_jp", "매일 한 문장씩 일본어 연습 중", true);
         given(userRepository.findById(2L)).willReturn(Optional.of(user));
+        given(userRepository.save(any(User.class))).willAnswer(invocation -> invocation.getArgument(0));
         MockMultipartFile file = new MockMultipartFile("file", "profile.png", "image/png", "image".getBytes());
         given(profileImageStorageService.storeProfileImage(2L, file))
                 .willReturn("/uploads/profile/2-1234.png");

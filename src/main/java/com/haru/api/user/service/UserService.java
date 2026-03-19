@@ -60,8 +60,9 @@ public class UserService {
         }
 
         user.changeProfileImageUrl(profileImageUrl);
-        log.info("[UserProfileImage] db updated userId={}", userId);
-        return UpdateProfileImageResponse.from(user);
+        User savedUser = userRepository.save(user);
+        log.info("[UserProfileImage] db updated userId={} profileImageUrl={}", userId, savedUser.getProfileImageUrl());
+        return UpdateProfileImageResponse.from(savedUser);
     }
 
     public UserBuddyCodeResponse getBuddyCode(Long userId) {
@@ -75,6 +76,8 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId));
 
-        return UserProfileResponse.from(user);
+        UserProfileResponse response = UserProfileResponse.from(user);
+        log.info("[UserProfile] response includes profileImageUrl={}", response.profileImageUrl());
+        return response;
     }
 }
