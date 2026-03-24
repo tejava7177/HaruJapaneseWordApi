@@ -1,0 +1,85 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Build boot jar
+        run: |
+          echo "Building Spring Boot jar with Gradle..."
+          ./gradlew bootJar --no-daemon
+          echo "Build completed."
+
+      - name: Deploy on EC2 over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script_stop: true
+          command_timeout: 30m
+          script: |
+            set -Eeuo pipefail
+
+            echo "[1/12] cd ~/HaruJapaneseWordApi"
+            cd ~/HaruJapaneseWordApi
+
+            echo "[2/12] git fetch"
+            git fetch
+
+            echo "[3/12] git checkout main"
+            git checkout main
+
+            echo "[4/12] git pull origin main"
+            git pull origin main
+
+            echo "[5/12] docker-compose down"
+            docker-compose down
+
+            echo "[6/12] rm -f build/libs/app.jar"
+            rm -f build/libs/app.jar
+
+            echo "[7/12] ./gradlew clean bootJar"
+            ./gradlew clean bootJar
+
+            echo "[8/12] docker-compose build --no-cache"
+            docker-compose build --no-cache
+
+            echo "[9/12] docker-compose up -d"
+            docker-compose up -d
+
+            echo "[10/12] docker-compose ps"
+            docker-compose ps
+
+            echo "[11/12] docker-compose logs --tail=200 haru-api || true"
+            docker-compose logs --tail=200 haru-api || true
+
+            echo "[12/12] curl -f http://localhost:8080/actuator/health"
+            curl -f http://localhost:8080/actuator/health || exit 1
