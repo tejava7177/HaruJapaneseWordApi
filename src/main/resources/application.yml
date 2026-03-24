@@ -5,6 +5,7 @@ server:
 
 app:
   seed:
+    users: true
     buddies: false
   profile-image:
     storage-path: ${user.dir}/uploads/profile

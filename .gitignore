@@ -29,10 +29,10 @@ bin/
 # =========================
 .env
 .env.*
+!.env.example
 application-local.yml
 application-secret.yml
 application-dev.yml
-application-prod.yml
 
 # =========================
 # Local runtime/editor temp files

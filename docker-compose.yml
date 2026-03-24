@@ -1,0 +1,13 @@
+services:
+  haru-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: haru-api
+    env_file:
+      - .env
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+    ports:
+      - "8080:8080"
+    restart: unless-stopped

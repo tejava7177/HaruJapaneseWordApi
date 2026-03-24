@@ -9,6 +9,7 @@ import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @Order(1)
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "app.seed.users", havingValue = "true")
 public class UserDataInitializer implements CommandLineRunner {
 
     private static final List<SeedUserSpec> SEED_USERS = List.of(
