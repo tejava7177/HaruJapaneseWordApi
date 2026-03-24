@@ -9,8 +9,8 @@ import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.annotation.Order;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,7 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @Order(1)
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "app.seed.users", havingValue = "true")
 public class UserDataInitializer implements CommandLineRunner {
 
     private static final List<SeedUserSpec> SEED_USERS = List.of(
@@ -31,9 +30,17 @@ public class UserDataInitializer implements CommandLineRunner {
     private final UserRepository userRepository;
     private final BuddyCodeService buddyCodeService;
 
+    @Value("${app.seed.users:false}")
+    private boolean seedUsersOnStartup;
+
     @Override
     @Transactional
     public void run(String... args) {
+        if (!seedUsersOnStartup) {
+            log.info("[init] test user seeding skipped because app.seed.users=false");
+            return;
+        }
+
         seedUsers();
     }
 
