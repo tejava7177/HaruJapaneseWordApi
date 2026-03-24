@@ -86,5 +86,17 @@ jobs:
             echo "[12/13] docker-compose logs --tail=200 haru-api || true"
             docker-compose logs --tail=200 haru-api || true
 
-            echo "[13/13] curl -f http://localhost:8080/actuator/health"
-            curl -f http://localhost:8080/actuator/health
+            echo "[13/13] wait for health check"
+            for i in {1..18}; do
+            if curl -fsS http://localhost:8080/actuator/health; then
+            echo "Health check passed."
+            exit 0
+            fi
+            echo "Health check failed, retrying in 10s... ($i/18)"
+            sleep 10
+            done
+            
+            echo "Health check did not pass in time."
+            docker-compose ps || true
+            docker-compose logs --tail=300 haru-api || true
+            exit 1
