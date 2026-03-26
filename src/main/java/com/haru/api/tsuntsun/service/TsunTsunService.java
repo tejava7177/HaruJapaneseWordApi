@@ -8,7 +8,7 @@ import com.haru.api.dailyword.domain.DailyWordItem;
 import com.haru.api.dailyword.domain.DailyWordSet;
 import com.haru.api.dailyword.repository.DailyWordItemRepository;
 import com.haru.api.dailyword.repository.DailyWordSetRepository;
-import com.haru.api.push.ApnsPushService;
+import com.haru.api.push.PushNotificationService;
 import com.haru.api.tsuntsun.domain.TsunTsun;
 import com.haru.api.tsuntsun.domain.TsunTsunAnswer;
 import com.haru.api.tsuntsun.domain.TsunTsunStatus;
@@ -59,7 +59,7 @@ public class TsunTsunService {
     private final DailyWordSetRepository dailyWordSetRepository;
     private final MeaningRepository meaningRepository;
     private final TsunTsunQuizService tsunTsunQuizService;
-    private final ApnsPushService apnsPushService;
+    private final PushNotificationService pushNotificationService;
 
     @Transactional
     public TsunTsunQuizResponse sendTsunTsun(Long senderId, Long receiverId, Long dailyWordItemId) {
@@ -137,7 +137,7 @@ public class TsunTsunService {
                 saved.getId(), senderId, receiverId, today);
 
         List<QuizChoiceResponse> choices = tsunTsunQuizService.generateChoices(word);
-        apnsPushService.sendTsunTsunPush(receiverId, saved.getId());
+        pushNotificationService.notifyTsunTsunReceived(receiverId, saved.getId(), senderId);
 
         return TsunTsunQuizResponse.from(saved, choices);
     }

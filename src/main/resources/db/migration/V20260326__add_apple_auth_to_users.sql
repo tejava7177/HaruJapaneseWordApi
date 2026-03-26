@@ -1,0 +1,7 @@
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS apple_subject VARCHAR(255) NULL,
+    ADD COLUMN IF NOT EXISTS auth_email VARCHAR(255) NULL,
+    ADD COLUMN IF NOT EXISTS display_name VARCHAR(255) NULL,
+    ADD COLUMN IF NOT EXISTS last_login_at DATETIME NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_users_apple_subject ON users (apple_subject);

@@ -44,16 +44,28 @@ public class User {
     @Column(name = "random_matching_enabled", nullable = false)
     private boolean randomMatchingEnabled;
 
+    @Column(name = "apple_subject", unique = true)
+    private String appleSubject;
+
+    @Column(name = "auth_email")
+    private String authEmail;
+
+    @Column(name = "display_name")
+    private String displayName;
+
+    @Column(name = "last_login_at")
+    private LocalDateTime lastLoginAt;
+
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
     public User(Long id, String nickname, WordLevel learningLevel) {
-        this(id, nickname, learningLevel, null, null, null, null, false);
+        this(id, nickname, learningLevel, null, null, null, null, false, null, null, null, null);
     }
 
     public User(Long id, String nickname, WordLevel learningLevel, String buddyCode) {
-        this(id, nickname, learningLevel, buddyCode, null, null, null, false);
+        this(id, nickname, learningLevel, buddyCode, null, null, null, false, null, null, null, null);
     }
 
     public User(
@@ -66,6 +78,24 @@ public class User {
             String bio,
             boolean randomMatchingEnabled
     ) {
+        this(id, nickname, learningLevel, buddyCode, profileImageUrl, instagramId, bio, randomMatchingEnabled,
+                null, null, null, null);
+    }
+
+    public User(
+            Long id,
+            String nickname,
+            WordLevel learningLevel,
+            String buddyCode,
+            String profileImageUrl,
+            String instagramId,
+            String bio,
+            boolean randomMatchingEnabled,
+            String appleSubject,
+            String authEmail,
+            String displayName,
+            LocalDateTime lastLoginAt
+    ) {
         this.id = id;
         this.nickname = nickname;
         this.learningLevel = learningLevel;
@@ -74,6 +104,10 @@ public class User {
         this.instagramId = instagramId;
         this.bio = bio;
         this.randomMatchingEnabled = randomMatchingEnabled;
+        this.appleSubject = appleSubject;
+        this.authEmail = authEmail;
+        this.displayName = displayName;
+        this.lastLoginAt = lastLoginAt;
     }
 
     public void changeLearningLevel(WordLevel learningLevel) {
@@ -86,5 +120,12 @@ public class User {
 
     public void changeProfileImageUrl(String profileImageUrl) {
         this.profileImageUrl = profileImageUrl;
+    }
+
+    public void linkAppleAuth(String appleSubject, String authEmail, String displayName, LocalDateTime lastLoginAt) {
+        this.appleSubject = appleSubject;
+        this.authEmail = authEmail;
+        this.displayName = displayName;
+        this.lastLoginAt = lastLoginAt;
     }
 }

@@ -9,5 +9,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByBuddyCode(String buddyCode);
 
+    Optional<User> findByAppleSubject(String appleSubject);
+
+    Optional<User> findTopByOrderByIdDesc();
+
     List<User> findByRandomMatchingEnabledTrueOrderByIdAsc();
 }

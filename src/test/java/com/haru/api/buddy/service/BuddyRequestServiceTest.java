@@ -15,6 +15,7 @@ import com.haru.api.buddy.dto.IncomingBuddyRequestResponse;
 import com.haru.api.buddy.repository.BuddyRequestRepository;
 import com.haru.api.buddy.repository.BuddyRelationshipRepository;
 import com.haru.api.buddy.repository.BuddyRepository;
+import com.haru.api.push.PushNotificationService;
 import com.haru.api.tsuntsun.repository.TsunTsunRepository;
 import com.haru.api.user.domain.User;
 import com.haru.api.user.repository.UserRepository;
@@ -49,11 +50,20 @@ class BuddyRequestServiceTest {
     @Mock
     private TsunTsunRepository tsunTsunRepository;
 
+    @Mock
+    private PushNotificationService pushNotificationService;
+
     private BuddyRequestService buddyRequestService;
 
     @BeforeEach
     void setUp() {
-        buddyRequestService = new BuddyRequestService(buddyRequestRepository, buddyRepository, userRepository, buddyService);
+        buddyRequestService = new BuddyRequestService(
+                buddyRequestRepository,
+                buddyRepository,
+                userRepository,
+                buddyService,
+                pushNotificationService
+        );
     }
 
     @Test
@@ -107,6 +117,7 @@ class BuddyRequestServiceTest {
         assertThat(response.requestId()).isEqualTo(10L);
         assertThat(response.status()).isEqualTo(BuddyRequestStatus.PENDING);
         verify(buddyRequestRepository).save(any(BuddyRequest.class));
+        verify(pushNotificationService).notifyBuddyRequestReceived(2L, 10L, 1L);
     }
 
     @Test
@@ -222,7 +233,8 @@ class BuddyRequestServiceTest {
                 buddyRequestRepository,
                 buddyRepository,
                 userRepository,
-                realBuddyService
+                realBuddyService,
+                pushNotificationService
         );
 
         given(buddyRequestRepository.findWithUsersById(10L)).willReturn(java.util.Optional.of(buddyRequest));
@@ -242,6 +254,7 @@ class BuddyRequestServiceTest {
         assertThat(response.status()).isEqualTo(BuddyRequestStatus.ACCEPTED);
         assertThat(buddyRequest.getStatus()).isEqualTo(BuddyRequestStatus.ACCEPTED);
         assertThat(buddyRequest.getRespondedAt()).isNotNull();
+        verify(pushNotificationService).notifyBuddyAccepted(1L, 10L, 2L);
     }
 
     @Test

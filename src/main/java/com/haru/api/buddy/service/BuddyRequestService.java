@@ -8,6 +8,7 @@ import com.haru.api.buddy.dto.OutgoingBuddyRequestResponse;
 import com.haru.api.buddy.repository.BuddyRequestRepository;
 import com.haru.api.buddy.repository.BuddyRepository;
 import com.haru.api.buddy.domain.BuddyStatus;
+import com.haru.api.push.PushNotificationService;
 import com.haru.api.user.domain.User;
 import com.haru.api.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ public class BuddyRequestService {
     private final BuddyRepository buddyRepository;
     private final UserRepository userRepository;
     private final BuddyService buddyService;
+    private final PushNotificationService pushNotificationService;
 
     @Transactional
     public BuddyRequestActionResponse createRequest(Long requesterId, Long targetUserId) {
@@ -49,6 +51,7 @@ public class BuddyRequestService {
                 targetUserId,
                 buddyRequest.getId()
         );
+        pushNotificationService.notifyBuddyRequestReceived(targetUserId, buddyRequest.getId(), requesterId);
         return BuddyRequestActionResponse.from(buddyRequest);
     }
 
@@ -125,6 +128,7 @@ public class BuddyRequestService {
         buddyRequest.accept();
         log.info("[BuddyRequest] request status after={}", buddyRequest.getStatus());
         log.info("[BuddyRequest] accept success requestId={}", requestId);
+        pushNotificationService.notifyBuddyAccepted(requesterId, buddyRequest.getId(), targetUserId);
         return BuddyRequestActionResponse.from(buddyRequest);
     }
 

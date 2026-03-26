@@ -14,7 +14,7 @@ import com.haru.api.dailyword.domain.DailyWordItem;
 import com.haru.api.dailyword.domain.DailyWordSet;
 import com.haru.api.dailyword.repository.DailyWordItemRepository;
 import com.haru.api.dailyword.repository.DailyWordSetRepository;
-import com.haru.api.push.ApnsPushService;
+import com.haru.api.push.PushNotificationService;
 import com.haru.api.tsuntsun.domain.TsunTsun;
 import com.haru.api.tsuntsun.domain.TsunTsunStatus;
 import com.haru.api.tsuntsun.dto.QuizChoiceResponse;
@@ -52,7 +52,7 @@ class TsunTsunServiceTest {
     @Mock private DailyWordSetRepository dailyWordSetRepository;
     @Mock private MeaningRepository meaningRepository;
     @Mock private TsunTsunQuizService tsunTsunQuizService;
-    @Mock private ApnsPushService apnsPushService;
+    @Mock private PushNotificationService pushNotificationService;
 
     private TsunTsunService tsunTsunService;
 
@@ -67,7 +67,7 @@ class TsunTsunServiceTest {
                 dailyWordSetRepository,
                 meaningRepository,
                 tsunTsunQuizService,
-                apnsPushService
+                pushNotificationService
         );
     }
 
@@ -219,6 +219,7 @@ class TsunTsunServiceTest {
 
         TsunTsunQuizResponse next = tsunTsunService.sendTsunTsun(1L, 2L, 11L);
         assertThat(next.tsuntsunId()).isEqualTo(88L);
+        verify(pushNotificationService).notifyTsunTsunReceived(2L, 88L, 1L);
     }
 
     @Test
@@ -265,6 +266,7 @@ class TsunTsunServiceTest {
         TsunTsunQuizResponse response = tsunTsunService.sendTsunTsun(2L, 1L, 12L);
 
         assertThat(response.tsuntsunId()).isEqualTo(77L);
+        verify(pushNotificationService).notifyTsunTsunReceived(1L, 77L, 2L);
     }
 
     private Buddy mockActiveBuddy(User user, User buddyUser, Long relationshipId) {
