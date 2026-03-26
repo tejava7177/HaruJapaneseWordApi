@@ -22,13 +22,16 @@ import org.springframework.web.server.ResponseStatusException;
 @Transactional(readOnly = true)
 public class UserService {
 
+    private static final int MAX_NICKNAME_LENGTH = 30;
+    private static final int MAX_BIO_LENGTH = 160;
+    private static final int MAX_INSTAGRAM_ID_LENGTH = 30;
+
     private final UserRepository userRepository;
     private final ProfileImageStorageService profileImageStorageService;
 
     @Transactional
     public UpdateLearningLevelResponse updateLearningLevel(Long userId, WordLevel learningLevel) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId));
+        User user = findUserOrThrow(userId);
 
         user.changeLearningLevel(learningLevel);
         return UpdateLearningLevelResponse.from(user);
@@ -36,19 +39,29 @@ public class UserService {
 
     @Transactional
     public UpdateRandomMatchingResponse updateRandomMatchingEnabled(Long userId, boolean enabled) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId));
+        User user = findUserOrThrow(userId);
 
         user.changeRandomMatchingEnabled(enabled);
         return UpdateRandomMatchingResponse.from(user);
     }
 
     @Transactional
+    public UserProfileResponse updateUserProfile(Long userId, String nickname, String bio, String instagramId) {
+        User user = findUserOrThrow(userId);
+
+        String normalizedNickname = normalizeNickname(nickname);
+        String normalizedBio = normalizeOptionalText("bio", bio, MAX_BIO_LENGTH);
+        String normalizedInstagramId = normalizeOptionalText("instagramId", instagramId, MAX_INSTAGRAM_ID_LENGTH);
+
+        user.updateProfile(normalizedNickname, normalizedBio, normalizedInstagramId);
+        return UserProfileResponse.from(user);
+    }
+
+    @Transactional
     public UpdateProfileImageResponse uploadProfileImage(Long userId, MultipartFile file) {
         log.info("[UserProfileImage] upload start userId={}", userId);
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId));
+        User user = findUserOrThrow(userId);
 
         String profileImageUrl;
         try {
@@ -66,18 +79,57 @@ public class UserService {
     }
 
     public UserBuddyCodeResponse getBuddyCode(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId));
+        User user = findUserOrThrow(userId);
 
         return UserBuddyCodeResponse.from(user);
     }
 
     public UserProfileResponse getUserProfile(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId));
+        User user = findUserOrThrow(userId);
 
         UserProfileResponse response = UserProfileResponse.from(user);
         log.info("[UserProfile] response includes profileImageUrl={}", response.profileImageUrl());
         return response;
+    }
+
+    private User findUserOrThrow(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId));
+    }
+
+    private String normalizeNickname(String nickname) {
+        if (nickname == null) {
+            return null;
+        }
+
+        String trimmedNickname = nickname.trim();
+        if (trimmedNickname.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "nickname must not be blank");
+        }
+        if (trimmedNickname.length() > MAX_NICKNAME_LENGTH) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "nickname must be at most " + MAX_NICKNAME_LENGTH + " characters"
+            );
+        }
+        return trimmedNickname;
+    }
+
+    private String normalizeOptionalText(String fieldName, String value, int maxLength) {
+        if (value == null) {
+            return null;
+        }
+
+        String trimmedValue = value.trim();
+        if (trimmedValue.isEmpty()) {
+            return null;
+        }
+        if (trimmedValue.length() > maxLength) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    fieldName + " must be at most " + maxLength + " characters"
+            );
+        }
+        return trimmedValue;
     }
 }

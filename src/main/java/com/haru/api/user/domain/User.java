@@ -122,6 +122,14 @@ public class User {
         this.profileImageUrl = profileImageUrl;
     }
 
+    public void updateProfile(String nickname, String bio, String instagramId) {
+        if (nickname != null) {
+            this.nickname = nickname;
+        }
+        this.bio = bio;
+        this.instagramId = instagramId;
+    }
+
     public void linkAppleAuth(String appleSubject, String authEmail, String displayName, LocalDateTime lastLoginAt) {
         this.appleSubject = appleSubject;
         this.authEmail = authEmail;

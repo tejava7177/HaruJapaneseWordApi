@@ -5,6 +5,7 @@ import com.haru.api.user.dto.UpdateLearningLevelResponse;
 import com.haru.api.user.dto.UpdateProfileImageResponse;
 import com.haru.api.user.dto.UpdateRandomMatchingRequest;
 import com.haru.api.user.dto.UpdateRandomMatchingResponse;
+import com.haru.api.user.dto.UpdateUserProfileRequest;
 import com.haru.api.user.dto.UserBuddyCodeResponse;
 import com.haru.api.user.dto.UserProfileResponse;
 import com.haru.api.user.service.UserService;
@@ -59,6 +60,15 @@ public class UserController {
             @Valid @RequestBody UpdateRandomMatchingRequest request
     ) {
         return userService.updateRandomMatchingEnabled(userId, request.enabled());
+    }
+
+    @PatchMapping("/{userId}/profile")
+    @Operation(summary = "사용자 프로필 수정")
+    public UserProfileResponse updateUserProfile(
+            @PathVariable Long userId,
+            @Valid @RequestBody UpdateUserProfileRequest request
+    ) {
+        return userService.updateUserProfile(userId, request.nickname(), request.bio(), request.instagramId());
     }
 
     @PostMapping(value = "/{userId}/profile-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

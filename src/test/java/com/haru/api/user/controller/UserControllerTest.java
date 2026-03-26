@@ -156,6 +156,84 @@ class UserControllerTest {
     }
 
     @Test
+    void updateUserProfile_returnsUpdatedProfile() throws Exception {
+        UserProfileResponse response = new UserProfileResponse(
+                1L,
+                "심주흔",
+                WordLevel.N2,
+                "매일 한 문장씩 일본어 연습 중",
+                "@minsung_jp",
+                "4C4AFKN2",
+                false,
+                null
+        );
+        given(userService.updateUserProfile(1L, "심주흔", "매일 한 문장씩 일본어 연습 중", "@minsung_jp"))
+                .willReturn(response);
+
+        mockMvc.perform(patch("/api/users/1/profile")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "nickname":"심주흔",
+                                  "bio":"매일 한 문장씩 일본어 연습 중",
+                                  "instagramId":"@minsung_jp"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(1))
+                .andExpect(jsonPath("$.nickname").value("심주흔"))
+                .andExpect(jsonPath("$.bio").value("매일 한 문장씩 일본어 연습 중"))
+                .andExpect(jsonPath("$.instagramId").value("@minsung_jp"))
+                .andExpect(jsonPath("$.buddyCode").value("4C4AFKN2"))
+                .andExpect(jsonPath("$.randomMatchingEnabled").value(false));
+    }
+
+    @Test
+    void updateUserProfile_returnsBadRequestWhenNicknameTooLong() throws Exception {
+        mockMvc.perform(patch("/api/users/1/profile")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "nickname":"1234567890123456789012345678901"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("nickname: must be at most 30 characters"));
+    }
+
+    @Test
+    void updateUserProfile_returnsBadRequestWhenNicknameBlank() throws Exception {
+        given(userService.updateUserProfile(1L, "   ", null, null))
+                .willThrow(new ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "nickname must not be blank"));
+
+        mockMvc.perform(patch("/api/users/1/profile")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "nickname":"   "
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("nickname must not be blank"));
+    }
+
+    @Test
+    void updateUserProfile_returnsNotFoundWhenUserMissing() throws Exception {
+        given(userService.updateUserProfile(999L, "심주흔", null, null))
+                .willThrow(new ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "User not found: 999"));
+
+        mockMvc.perform(patch("/api/users/999/profile")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "nickname":"심주흔"
+                                }
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("User not found: 999"));
+    }
+
+    @Test
     void uploadProfileImage_returnsUpdatedProfileImageUrl() throws Exception {
         UpdateProfileImageResponse response =
                 new UpdateProfileImageResponse(2L, "/uploads/profile/2-1234.png");

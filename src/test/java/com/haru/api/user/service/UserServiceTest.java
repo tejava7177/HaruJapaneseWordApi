@@ -81,6 +81,61 @@ class UserServiceTest {
     }
 
     @Test
+    void updateUserProfile_updatesNicknameBioAndInstagramId() {
+        User user = new User(2L, "김민성", WordLevel.N2, "8TR4XK6N", null, null, null, true);
+        given(userRepository.findById(2L)).willReturn(Optional.of(user));
+
+        UserProfileResponse response = userService.updateUserProfile(
+                2L,
+                "  심주흔  ",
+                "  매일 한 문장씩 일본어 연습 중  ",
+                "  @minsung_jp  "
+        );
+
+        assertThat(response.userId()).isEqualTo(2L);
+        assertThat(response.nickname()).isEqualTo("심주흔");
+        assertThat(response.bio()).isEqualTo("매일 한 문장씩 일본어 연습 중");
+        assertThat(response.instagramId()).isEqualTo("@minsung_jp");
+        assertThat(user.getNickname()).isEqualTo("심주흔");
+        assertThat(user.getBio()).isEqualTo("매일 한 문장씩 일본어 연습 중");
+        assertThat(user.getInstagramId()).isEqualTo("@minsung_jp");
+    }
+
+    @Test
+    void updateUserProfile_storesNullForBlankBioAndInstagramId() {
+        User user = new User(2L, "김민성", WordLevel.N2, "8TR4XK6N", null, "@old", "old bio", true);
+        given(userRepository.findById(2L)).willReturn(Optional.of(user));
+
+        UserProfileResponse response = userService.updateUserProfile(2L, null, "   ", "");
+
+        assertThat(response.nickname()).isEqualTo("김민성");
+        assertThat(response.bio()).isNull();
+        assertThat(response.instagramId()).isNull();
+        assertThat(user.getNickname()).isEqualTo("김민성");
+        assertThat(user.getBio()).isNull();
+        assertThat(user.getInstagramId()).isNull();
+    }
+
+    @Test
+    void updateUserProfile_failsWhenNicknameBlank() {
+        User user = new User(2L, "김민성", WordLevel.N2, "8TR4XK6N");
+        given(userRepository.findById(2L)).willReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> userService.updateUserProfile(2L, "   ", "bio", "@id"))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("nickname must not be blank");
+    }
+
+    @Test
+    void updateUserProfile_failsWhenUserMissing() {
+        given(userRepository.findById(999L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.updateUserProfile(999L, "심주흔", "bio", "@id"))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("User not found: 999");
+    }
+
+    @Test
     void getUserProfile_returnsUserProfile() {
         User user = new User(2L, "김민성", WordLevel.N2, "8TR4XK6N", "https://cdn.haru.app/profiles/2.png", "@minsung_jp", "매일 한 문장씩 일본어 연습 중", true);
         given(userRepository.findById(2L)).willReturn(Optional.of(user));
