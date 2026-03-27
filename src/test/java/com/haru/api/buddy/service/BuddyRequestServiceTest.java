@@ -19,6 +19,7 @@ import com.haru.api.push.PushNotificationService;
 import com.haru.api.tsuntsun.repository.TsunTsunRepository;
 import com.haru.api.user.domain.User;
 import com.haru.api.user.repository.UserRepository;
+import com.haru.api.user.service.ActivityTrackingService;
 import com.haru.api.word.domain.WordLevel;
 import java.time.Clock;
 import java.time.Instant;
@@ -55,6 +56,9 @@ class BuddyRequestServiceTest {
 
     @Mock
     private PushNotificationService pushNotificationService;
+
+    @Mock
+    private ActivityTrackingService activityTrackingService;
 
     private BuddyRequestService buddyRequestService;
 
@@ -231,6 +235,7 @@ class BuddyRequestServiceTest {
                 buddyRequestRepository,
                 tsunTsunRepository,
                 userRepository,
+                activityTrackingService,
                 Clock.fixed(Instant.parse("2026-03-27T15:00:00Z"), ZoneId.of("Asia/Seoul"))
         );
         BuddyRequestService acceptService = new BuddyRequestService(

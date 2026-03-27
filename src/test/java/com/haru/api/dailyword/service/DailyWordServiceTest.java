@@ -15,6 +15,7 @@ import com.haru.api.tsuntsun.repository.TsunTsunAnswerRepository;
 import com.haru.api.tsuntsun.repository.TsunTsunRepository;
 import com.haru.api.user.domain.User;
 import com.haru.api.user.repository.UserRepository;
+import com.haru.api.user.service.ActivityTrackingService;
 import com.haru.api.word.domain.Word;
 import com.haru.api.word.domain.WordLevel;
 import com.haru.api.word.repository.WordRepository;
@@ -53,6 +54,9 @@ class DailyWordServiceTest {
     @Mock
     private TsunTsunAnswerRepository tsunTsunAnswerRepository;
 
+    @Mock
+    private ActivityTrackingService activityTrackingService;
+
     private Clock clock;
     private DailyWordService dailyWordService;
 
@@ -65,6 +69,7 @@ class DailyWordServiceTest {
                 dailyWordSetRepository,
                 tsunTsunRepository,
                 tsunTsunAnswerRepository,
+                activityTrackingService,
                 clock
         );
     }
@@ -127,6 +132,7 @@ class DailyWordServiceTest {
                 dailyWordSetRepository,
                 tsunTsunRepository,
                 tsunTsunAnswerRepository,
+                activityTrackingService,
                 fixedClockAtKst("2026-03-27T23:59:00+09:00")
         );
         User user = new User(4L, "buddy4", WordLevel.N2, "BUDDY004");
@@ -150,6 +156,7 @@ class DailyWordServiceTest {
                 dailyWordSetRepository,
                 tsunTsunRepository,
                 tsunTsunAnswerRepository,
+                activityTrackingService,
                 fixedClockAtKst("2026-03-28T00:00:00+09:00")
         );
         User user = new User(4L, "buddy4", WordLevel.N2, "BUDDY004");

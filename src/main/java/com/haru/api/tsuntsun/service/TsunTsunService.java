@@ -25,6 +25,7 @@ import com.haru.api.tsuntsun.repository.TsunTsunAnswerRepository;
 import com.haru.api.tsuntsun.repository.TsunTsunRepository;
 import com.haru.api.user.domain.User;
 import com.haru.api.user.repository.UserRepository;
+import com.haru.api.user.service.ActivityTrackingService;
 import com.haru.api.word.domain.Meaning;
 import com.haru.api.word.domain.Word;
 import com.haru.api.word.repository.MeaningRepository;
@@ -64,10 +65,12 @@ public class TsunTsunService {
     private final MeaningRepository meaningRepository;
     private final TsunTsunQuizService tsunTsunQuizService;
     private final PushNotificationService pushNotificationService;
+    private final ActivityTrackingService activityTrackingService;
     private final Clock clock;
 
     @Transactional
     public TsunTsunQuizResponse sendTsunTsun(Long senderId, Long receiverId, Long dailyWordItemId) {
+        activityTrackingService.touch(senderId);
         log.info("[tsuntsun/send] request received: senderId={}, receiverId={}, dailyWordItemId={}",
                 senderId, receiverId, dailyWordItemId);
 
@@ -167,6 +170,7 @@ public class TsunTsunService {
     public TsunTsunAnswerResponse answerTsunTsun(Long tsuntsunId, Long meaningId) {
         TsunTsun tsunTsun = tsunTsunRepository.findWithWordById(tsuntsunId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "TsunTsun not found: " + tsuntsunId));
+        activityTrackingService.touch(tsunTsun.getReceiver().getId());
 
         if (tsunTsun.getStatus() == TsunTsunStatus.ANSWERED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미 답변한 츤츤입니다.");
@@ -222,6 +226,7 @@ public class TsunTsunService {
 
     @Transactional(readOnly = true)
     public TsunTsunInboxResponse getInbox(Long userId) {
+        activityTrackingService.touch(userId);
         if (!userRepository.existsById(userId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId);
         }
@@ -241,6 +246,7 @@ public class TsunTsunService {
 
     @Transactional(readOnly = true)
     public TsunTsunTodayResponse getTodayTsunTsuns(Long userId, Long buddyId) {
+        activityTrackingService.touch(userId);
         log.info("[tsuntsun/today] request received: userId={}, buddyId={}", userId, buddyId);
 
         try {

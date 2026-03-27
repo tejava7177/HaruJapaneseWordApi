@@ -25,6 +25,7 @@ import com.haru.api.tsuntsun.repository.TsunTsunAnswerRepository;
 import com.haru.api.tsuntsun.repository.TsunTsunRepository;
 import com.haru.api.user.domain.User;
 import com.haru.api.user.repository.UserRepository;
+import com.haru.api.user.service.ActivityTrackingService;
 import com.haru.api.word.domain.Meaning;
 import com.haru.api.word.domain.Word;
 import com.haru.api.word.domain.WordLevel;
@@ -60,6 +61,7 @@ class TsunTsunServiceTest {
     @Mock private MeaningRepository meaningRepository;
     @Mock private TsunTsunQuizService tsunTsunQuizService;
     @Mock private PushNotificationService pushNotificationService;
+    @Mock private ActivityTrackingService activityTrackingService;
 
     private Clock clock;
     private TsunTsunService tsunTsunService;
@@ -77,6 +79,7 @@ class TsunTsunServiceTest {
                 meaningRepository,
                 tsunTsunQuizService,
                 pushNotificationService,
+                activityTrackingService,
                 clock
         );
     }
@@ -611,6 +614,7 @@ class TsunTsunServiceTest {
                 meaningRepository,
                 tsunTsunQuizService,
                 pushNotificationService,
+                activityTrackingService,
                 fixedClockAtKst("2026-03-27T23:59:00+09:00")
         );
         LocalDate targetDate = LocalDate.of(2026, 3, 27);
@@ -637,6 +641,7 @@ class TsunTsunServiceTest {
                 meaningRepository,
                 tsunTsunQuizService,
                 pushNotificationService,
+                activityTrackingService,
                 fixedClockAtKst("2026-03-28T00:00:00+09:00")
         );
         LocalDate targetDate = LocalDate.of(2026, 3, 28);

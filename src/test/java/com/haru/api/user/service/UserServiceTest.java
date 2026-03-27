@@ -31,11 +31,14 @@ class UserServiceTest {
     @Mock
     private ProfileImageStorageService profileImageStorageService;
 
+    @Mock
+    private ActivityTrackingService activityTrackingService;
+
     private UserService userService;
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(userRepository, profileImageStorageService);
+        userService = new UserService(userRepository, profileImageStorageService, activityTrackingService);
     }
 
     @Test

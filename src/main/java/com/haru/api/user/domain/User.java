@@ -59,16 +59,19 @@ public class User {
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
 
+    @Column(name = "last_active_at")
+    private LocalDateTime lastActiveAt;
+
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
     public User(Long id, String nickname, WordLevel learningLevel) {
-        this(id, nickname, learningLevel, null, null, null, null, false, true, null, null, null, null);
+        this(id, nickname, learningLevel, null, null, null, null, false, true, null, null, null, null, null);
     }
 
     public User(Long id, String nickname, WordLevel learningLevel, String buddyCode) {
-        this(id, nickname, learningLevel, buddyCode, null, null, null, false, true, null, null, null, null);
+        this(id, nickname, learningLevel, buddyCode, null, null, null, false, true, null, null, null, null, null);
     }
 
     public User(
@@ -82,7 +85,7 @@ public class User {
             boolean randomMatchingEnabled
     ) {
         this(id, nickname, learningLevel, buddyCode, profileImageUrl, instagramId, bio, randomMatchingEnabled,
-                true, null, null, null, null);
+                true, null, null, null, null, null);
     }
 
     public User(
@@ -97,7 +100,7 @@ public class User {
             boolean petalNotificationsEnabled
     ) {
         this(id, nickname, learningLevel, buddyCode, profileImageUrl, instagramId, bio, randomMatchingEnabled,
-                petalNotificationsEnabled, null, null, null, null);
+                petalNotificationsEnabled, null, null, null, null, null);
     }
 
     public User(
@@ -113,7 +116,8 @@ public class User {
             String appleSubject,
             String authEmail,
             String displayName,
-            LocalDateTime lastLoginAt
+            LocalDateTime lastLoginAt,
+            LocalDateTime lastActiveAt
     ) {
         this.id = id;
         this.nickname = nickname;
@@ -128,6 +132,7 @@ public class User {
         this.authEmail = authEmail;
         this.displayName = displayName;
         this.lastLoginAt = lastLoginAt;
+        this.lastActiveAt = lastActiveAt;
     }
 
     public User(
@@ -145,7 +150,7 @@ public class User {
             LocalDateTime lastLoginAt
     ) {
         this(id, nickname, learningLevel, buddyCode, profileImageUrl, instagramId, bio, randomMatchingEnabled,
-                true, appleSubject, authEmail, displayName, lastLoginAt);
+                true, appleSubject, authEmail, displayName, lastLoginAt, null);
     }
 
     public void changeLearningLevel(WordLevel learningLevel) {
@@ -177,5 +182,9 @@ public class User {
         this.authEmail = authEmail;
         this.displayName = displayName;
         this.lastLoginAt = lastLoginAt;
+    }
+
+    public void updateLastActiveAt(LocalDateTime lastActiveAt) {
+        this.lastActiveAt = lastActiveAt;
     }
 }

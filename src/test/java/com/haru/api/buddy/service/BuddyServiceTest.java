@@ -20,6 +20,7 @@ import com.haru.api.tsuntsun.domain.TsunTsunStatus;
 import com.haru.api.tsuntsun.repository.TsunTsunRepository;
 import com.haru.api.user.domain.User;
 import com.haru.api.user.repository.UserRepository;
+import com.haru.api.user.service.ActivityTrackingService;
 import com.haru.api.word.domain.WordLevel;
 import java.time.Clock;
 import java.time.Instant;
@@ -53,6 +54,9 @@ class BuddyServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private ActivityTrackingService activityTrackingService;
+
     private BuddyService buddyService;
 
     @BeforeEach
@@ -63,6 +67,7 @@ class BuddyServiceTest {
                 buddyRequestRepository,
                 tsunTsunRepository,
                 userRepository,
+                activityTrackingService,
                 Clock.fixed(Instant.parse("2026-03-27T15:00:00Z"), ZoneId.of("Asia/Seoul"))
         );
     }
@@ -89,6 +94,7 @@ class BuddyServiceTest {
         assertThat(response.buddyUserId()).isEqualTo(2L);
         assertThat(response.status()).isEqualTo(BuddyStatus.ACTIVE);
         assertThat(response.tikiTakaCount()).isEqualTo(0L);
+        assertThat(response.lastActiveAt()).isNull();
         assertThat(response.hasUnreadPetal()).isFalse();
     }
 

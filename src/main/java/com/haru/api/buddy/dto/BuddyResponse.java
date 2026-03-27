@@ -11,6 +11,7 @@ public record BuddyResponse(
         String buddyNickname,
         BuddyStatus status,
         Long tikiTakaCount,
+        LocalDateTime lastActiveAt,
         boolean hasUnreadPetal,
         LocalDateTime lastReceivedAt,
         LocalDateTime lastInteractionAt
@@ -18,6 +19,7 @@ public record BuddyResponse(
     public static BuddyResponse from(
             Buddy buddy,
             long tikiTakaCount,
+            LocalDateTime lastActiveAt,
             boolean hasUnreadPetal,
             LocalDateTime lastReceivedAt,
             LocalDateTime lastInteractionAt
@@ -29,6 +31,7 @@ public record BuddyResponse(
                 buddy.getBuddyUser().getNickname(),
                 buddy.getStatus(),
                 tikiTakaCount,
+                lastActiveAt,
                 hasUnreadPetal,
                 lastReceivedAt,
                 lastInteractionAt

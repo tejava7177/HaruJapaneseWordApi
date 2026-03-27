@@ -5,6 +5,7 @@ import com.haru.api.auth.dto.AppleAuthResponse;
 import com.haru.api.user.domain.User;
 import com.haru.api.user.repository.UserRepository;
 import com.haru.api.user.service.BuddyCodeService;
+import java.time.Clock;
 import com.haru.api.word.domain.WordLevel;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ public class AppleAuthService {
     private final UserRepository userRepository;
     private final BuddyCodeService buddyCodeService;
     private final AppleIdentityTokenParser appleIdentityTokenParser;
+    private final Clock clock;
 
     @Transactional
     public AppleAuthResponse authenticate(AppleAuthRequest request) {
@@ -33,12 +35,14 @@ public class AppleAuthService {
 
         return userRepository.findByAppleSubject(resolvedAuth.appleSubject())
                 .map(existingUser -> {
+                    LocalDateTime now = LocalDateTime.now(clock);
                     existingUser.linkAppleAuth(
                             resolvedAuth.appleSubject(),
                             resolvedAuth.email(),
                             resolvedAuth.displayName(),
-                            LocalDateTime.now()
+                            now
                     );
+                    existingUser.updateLastActiveAt(now);
                     return AppleAuthResponse.from(existingUser, false);
                 })
                 .orElseGet(() -> createNewUser(resolvedAuth));
@@ -83,6 +87,7 @@ public class AppleAuthService {
                 .map(user -> user.getId() + 1L)
                 .orElse(1L);
 
+        LocalDateTime now = LocalDateTime.now(clock);
         User newUser = new User(
                 nextUserId,
                 generateNickname(nextUserId, resolvedAuth.displayName()),
@@ -92,10 +97,12 @@ public class AppleAuthService {
                 null,
                 null,
                 false,
+                true,
                 resolvedAuth.appleSubject(),
                 resolvedAuth.email(),
                 resolvedAuth.displayName(),
-                LocalDateTime.now()
+                now,
+                now
         );
 
         try {
