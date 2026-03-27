@@ -12,6 +12,7 @@ import com.haru.api.user.repository.UserRepository;
 import com.haru.api.word.domain.Word;
 import com.haru.api.word.domain.WordLevel;
 import com.haru.api.word.repository.WordRepository;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -34,13 +35,14 @@ public class DailyWordService {
     private final DailyWordSetRepository dailyWordSetRepository;
     private final TsunTsunRepository tsunTsunRepository;
     private final TsunTsunAnswerRepository tsunTsunAnswerRepository;
+    private final Clock clock;
 
     @Transactional
     public DailyWordTodayResponse getTodayWords(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId));
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
 
         return dailyWordSetRepository.findWithItemsByUserIdAndTargetDate(userId, today)
                 .map(DailyWordTodayResponse::from)
@@ -52,7 +54,7 @@ public class DailyWordService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId));
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
         dailyWordSetRepository.findByUserIdAndTargetDate(userId, today)
                 .ifPresent(existingSet -> {
                     List<Long> dailyWordItemIds = existingSet.getItems().stream()

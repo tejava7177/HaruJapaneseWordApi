@@ -18,7 +18,10 @@ import com.haru.api.user.repository.UserRepository;
 import com.haru.api.word.domain.Word;
 import com.haru.api.word.domain.WordLevel;
 import com.haru.api.word.repository.WordRepository;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,6 +34,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class DailyWordServiceTest {
+
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+    private static final LocalDate FIXED_TODAY = LocalDate.of(2026, 3, 28);
 
     @Mock
     private UserRepository userRepository;
@@ -47,23 +53,26 @@ class DailyWordServiceTest {
     @Mock
     private TsunTsunAnswerRepository tsunTsunAnswerRepository;
 
+    private Clock clock;
     private DailyWordService dailyWordService;
 
     @BeforeEach
     void setUp() {
+        clock = fixedClockAtKst("2026-03-28T00:00:00+09:00");
         dailyWordService = new DailyWordService(
                 userRepository,
                 wordRepository,
                 dailyWordSetRepository,
                 tsunTsunRepository,
-                tsunTsunAnswerRepository
+                tsunTsunAnswerRepository,
+                clock
         );
     }
 
     @Test
     void regenerateTodayWordsForDevelopment_recreatesWhenExistingSetPresent() {
         User user = new User(4L, "buddy4", WordLevel.N2, "BUDDY004");
-        DailyWordSet existingSet = DailyWordSet.create(user, LocalDate.now(), WordLevel.N4);
+        DailyWordSet existingSet = DailyWordSet.create(user, FIXED_TODAY, WordLevel.N4);
         existingSet.addItem(new Word("old1", "old1", WordLevel.N4), 1);
         existingSet.addItem(new Word("old2", "old2", WordLevel.N4), 2);
         ReflectionTestUtils.setField(existingSet.getItems().get(0), "id", 101L);
@@ -71,12 +80,12 @@ class DailyWordServiceTest {
         BuddyRelationship relationship = BuddyRelationship.create();
         ReflectionTestUtils.setField(relationship, "id", 77L);
         TsunTsun tsunTsun = TsunTsun.sent(user, new User(1L, "juheun", WordLevel.N4, "JUHEUN01"),
-                existingSet.getItems().get(0).getWord(), existingSet.getItems().get(0), relationship, LocalDate.now());
+                existingSet.getItems().get(0).getWord(), existingSet.getItems().get(0), relationship, FIXED_TODAY);
         ReflectionTestUtils.setField(tsunTsun, "id", 1001L);
 
         given(userRepository.findById(4L)).willReturn(Optional.of(user));
-        given(dailyWordSetRepository.findByUserIdAndTargetDate(4L, LocalDate.now())).willReturn(Optional.of(existingSet));
-        given(tsunTsunRepository.findByDailyWordItemIdInAndTargetDate(List.of(101L, 102L), LocalDate.now()))
+        given(dailyWordSetRepository.findByUserIdAndTargetDate(4L, FIXED_TODAY)).willReturn(Optional.of(existingSet));
+        given(tsunTsunRepository.findByDailyWordItemIdInAndTargetDate(List.of(101L, 102L), FIXED_TODAY))
                 .willReturn(List.of(tsunTsun));
         given(wordRepository.findByLevelOrderByIdAsc(WordLevel.N2)).willReturn(wordsForLevel(WordLevel.N2));
         given(dailyWordSetRepository.saveAndFlush(any(DailyWordSet.class))).willAnswer(invocation -> invocation.getArgument(0));
@@ -85,7 +94,7 @@ class DailyWordServiceTest {
 
         verify(tsunTsunAnswerRepository).deleteByTsuntsunIdIn(List.of(1001L));
         verify(tsunTsunAnswerRepository).flush();
-        verify(tsunTsunRepository).deleteByDailyWordItemIdInAndTargetDate(List.of(101L, 102L), LocalDate.now());
+        verify(tsunTsunRepository).deleteByDailyWordItemIdInAndTargetDate(List.of(101L, 102L), FIXED_TODAY);
         verify(tsunTsunRepository).flush();
         verify(dailyWordSetRepository).delete(existingSet);
         verify(dailyWordSetRepository).flush();
@@ -99,15 +108,61 @@ class DailyWordServiceTest {
         User user = new User(4L, "buddy4", WordLevel.N2, "BUDDY004");
 
         given(userRepository.findById(4L)).willReturn(Optional.of(user));
-        given(dailyWordSetRepository.findByUserIdAndTargetDate(4L, LocalDate.now())).willReturn(Optional.empty());
+        given(dailyWordSetRepository.findByUserIdAndTargetDate(4L, FIXED_TODAY)).willReturn(Optional.empty());
         given(wordRepository.findByLevelOrderByIdAsc(WordLevel.N2)).willReturn(wordsForLevel(WordLevel.N2));
         given(dailyWordSetRepository.saveAndFlush(any(DailyWordSet.class))).willAnswer(invocation -> invocation.getArgument(0));
 
         DevDailyWordRegenerateResponse response = dailyWordService.regenerateTodayWordsForDevelopment(4L);
 
         assertThat(response.userId()).isEqualTo(4L);
-        assertThat(response.targetDate()).isEqualTo(LocalDate.now());
+        assertThat(response.targetDate()).isEqualTo(FIXED_TODAY);
         assertThat(response.itemCount()).isEqualTo(10);
+    }
+
+    @Test
+    void getTodayWords_usesKstDateBeforeMidnight() {
+        DailyWordService service = new DailyWordService(
+                userRepository,
+                wordRepository,
+                dailyWordSetRepository,
+                tsunTsunRepository,
+                tsunTsunAnswerRepository,
+                fixedClockAtKst("2026-03-27T23:59:00+09:00")
+        );
+        User user = new User(4L, "buddy4", WordLevel.N2, "BUDDY004");
+        LocalDate targetDate = LocalDate.of(2026, 3, 27);
+
+        given(userRepository.findById(4L)).willReturn(Optional.of(user));
+        given(dailyWordSetRepository.findWithItemsByUserIdAndTargetDate(4L, targetDate)).willReturn(Optional.empty());
+        given(wordRepository.findByLevelOrderByIdAsc(WordLevel.N2)).willReturn(wordsForLevel(WordLevel.N2));
+        given(dailyWordSetRepository.saveAndFlush(any(DailyWordSet.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        var response = service.getTodayWords(4L);
+
+        assertThat(response.targetDate()).isEqualTo(targetDate);
+    }
+
+    @Test
+    void getTodayWords_usesKstDateAfterMidnight() {
+        DailyWordService service = new DailyWordService(
+                userRepository,
+                wordRepository,
+                dailyWordSetRepository,
+                tsunTsunRepository,
+                tsunTsunAnswerRepository,
+                fixedClockAtKst("2026-03-28T00:00:00+09:00")
+        );
+        User user = new User(4L, "buddy4", WordLevel.N2, "BUDDY004");
+        LocalDate targetDate = LocalDate.of(2026, 3, 28);
+
+        given(userRepository.findById(4L)).willReturn(Optional.of(user));
+        given(dailyWordSetRepository.findWithItemsByUserIdAndTargetDate(4L, targetDate)).willReturn(Optional.empty());
+        given(wordRepository.findByLevelOrderByIdAsc(WordLevel.N2)).willReturn(wordsForLevel(WordLevel.N2));
+        given(dailyWordSetRepository.saveAndFlush(any(DailyWordSet.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        var response = service.getTodayWords(4L);
+
+        assertThat(response.targetDate()).isEqualTo(targetDate);
     }
 
     @Test
@@ -127,5 +182,9 @@ class DailyWordServiceTest {
                     return word;
                 })
                 .toList();
+    }
+
+    private Clock fixedClockAtKst(String isoOffsetDateTime) {
+        return Clock.fixed(OffsetDateTime.parse(isoOffsetDateTime).toInstant(), KST);
     }
 }

@@ -28,6 +28,7 @@ import com.haru.api.user.repository.UserRepository;
 import com.haru.api.word.domain.Meaning;
 import com.haru.api.word.domain.Word;
 import com.haru.api.word.repository.MeaningRepository;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -60,6 +61,7 @@ public class TsunTsunService {
     private final MeaningRepository meaningRepository;
     private final TsunTsunQuizService tsunTsunQuizService;
     private final PushNotificationService pushNotificationService;
+    private final Clock clock;
 
     @Transactional
     public TsunTsunQuizResponse sendTsunTsun(Long senderId, Long receiverId, Long dailyWordItemId) {
@@ -78,7 +80,7 @@ public class TsunTsunService {
         Buddy buddy = getActiveBuddy(senderId, receiverId);
         validateBuddyRelation(buddy, receiverId, senderId);
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
 
         long pairSendCount = tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDate(senderId, receiverId, today);
         if (pairSendCount >= DAILY_SEND_LIMIT_PER_BUDDY) {
@@ -205,7 +207,7 @@ public class TsunTsunService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId);
         }
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
         List<TsunTsunInboxItemResponse> items = tsunTsunRepository
                 .findByReceiverIdAndTargetDateAndStatusOrderByCreatedAtDesc(userId, today, TsunTsunStatus.SENT)
                 .stream()
@@ -236,7 +238,7 @@ public class TsunTsunService {
                 throw missingBuddyRelation(userId, buddyId);
             }
 
-            LocalDate today = LocalDate.now();
+            LocalDate today = LocalDate.now(clock);
             DailyWordSet buddySet = dailyWordSetRepository.findWithItemsByUserIdAndTargetDate(buddyId, today)
                     .orElseThrow(() -> new ResponseStatusException(
                             HttpStatus.NOT_FOUND,

@@ -29,7 +29,10 @@ import com.haru.api.word.domain.Meaning;
 import com.haru.api.word.domain.Word;
 import com.haru.api.word.domain.WordLevel;
 import com.haru.api.word.repository.MeaningRepository;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,6 +47,9 @@ import org.springframework.web.server.ResponseStatusException;
 @ExtendWith(MockitoExtension.class)
 class TsunTsunServiceTest {
 
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+    private static final LocalDate FIXED_TODAY = LocalDate.of(2026, 3, 28);
+
     @Mock private TsunTsunRepository tsunTsunRepository;
     @Mock private TsunTsunAnswerRepository tsunTsunAnswerRepository;
     @Mock private UserRepository userRepository;
@@ -54,10 +60,12 @@ class TsunTsunServiceTest {
     @Mock private TsunTsunQuizService tsunTsunQuizService;
     @Mock private PushNotificationService pushNotificationService;
 
+    private Clock clock;
     private TsunTsunService tsunTsunService;
 
     @BeforeEach
     void setUp() {
+        clock = fixedClockAtKst("2026-03-28T00:00:00+09:00");
         tsunTsunService = new TsunTsunService(
                 tsunTsunRepository,
                 tsunTsunAnswerRepository,
@@ -67,13 +75,14 @@ class TsunTsunServiceTest {
                 dailyWordSetRepository,
                 meaningRepository,
                 tsunTsunQuizService,
-                pushNotificationService
+                pushNotificationService,
+                clock
         );
     }
 
     @Test
     void sendTsunTsun_failsWhenSenderAlreadyHasPendingTsunTsun() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = FIXED_TODAY;
         User sender = new User(1L, "s", WordLevel.N4, "AAAA1111");
         User receiver = new User(2L, "r", WordLevel.N4, "BBBB2222");
 
@@ -93,7 +102,7 @@ class TsunTsunServiceTest {
 
     @Test
     void sendTsunTsun_failsWhenReceiverHasUnansweredTsunTsunForSender() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = FIXED_TODAY;
         User sender = new User(2L, "b", WordLevel.N4, "BBBB2222");
         User receiver = new User(1L, "a", WordLevel.N4, "AAAA1111");
 
@@ -113,7 +122,7 @@ class TsunTsunServiceTest {
 
     @Test
     void sendTsunTsun_failsWhenSameDailyWordItemAlreadySent() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = FIXED_TODAY;
         User sender = new User(1L, "s", WordLevel.N4, "AAAA1111");
         User receiver = new User(2L, "r", WordLevel.N4, "BBBB2222");
 
@@ -133,7 +142,7 @@ class TsunTsunServiceTest {
 
     @Test
     void sendTsunTsun_pairLimitWorksSeparatelyByBuddy() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = FIXED_TODAY;
         User sender = new User(1L, "s", WordLevel.N4, "AAAA1111");
         User buddyB = new User(2L, "b", WordLevel.N4, "BBBB2222");
         User buddyC = new User(3L, "c", WordLevel.N4, "CCCC3333");
@@ -173,7 +182,7 @@ class TsunTsunServiceTest {
 
     @Test
     void answerThenSendAgain_isAllowed() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = FIXED_TODAY;
         User sender = new User(1L, "s", WordLevel.N4, "AAAA1111");
         User receiver = new User(2L, "r", WordLevel.N4, "BBBB2222");
 
@@ -224,7 +233,7 @@ class TsunTsunServiceTest {
 
     @Test
     void sendTsunTsun_isAllowedInReverseDirectionAfterAnswer() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = FIXED_TODAY;
         User userA = new User(1L, "a", WordLevel.N4, "AAAA1111");
         User userB = new User(2L, "b", WordLevel.N4, "BBBB2222");
 
@@ -292,7 +301,7 @@ class TsunTsunServiceTest {
 
     @Test
     void answerTsunTsun_returnsWrongResultForWrongChoiceFromAnotherWord() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = FIXED_TODAY;
         User sender = new User(1L, "s", WordLevel.N4, "AAAA1111");
         User receiver = new User(2L, "r", WordLevel.N4, "BBBB2222");
 
@@ -330,7 +339,7 @@ class TsunTsunServiceTest {
 
     @Test
     void answerTsunTsun_returnsWrongResultForGiveUpChoice() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = FIXED_TODAY;
         User sender = new User(1L, "s", WordLevel.N4, "AAAA1111");
         User receiver = new User(2L, "r", WordLevel.N4, "BBBB2222");
 
@@ -360,7 +369,7 @@ class TsunTsunServiceTest {
 
     @Test
     void answerTsunTsun_failsWhenAlreadyAnswered() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = FIXED_TODAY;
         User sender = new User(1L, "s", WordLevel.N4, "AAAA1111");
         User receiver = new User(2L, "r", WordLevel.N4, "BBBB2222");
 
@@ -391,7 +400,7 @@ class TsunTsunServiceTest {
 
     @Test
     void getInbox_returnsTodayUnansweredTsunsForReceiver() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = FIXED_TODAY;
         User sender = new User(1L, "김민성", WordLevel.N4, "AAAA1111");
         User receiver = new User(2L, "buddy2", WordLevel.N4, "BBBB2222");
         Word word = new Word("紹介", "しょうかい", WordLevel.N4);
@@ -426,7 +435,7 @@ class TsunTsunServiceTest {
 
     @Test
     void getTodayTsunTsuns_returnsAnsweredCountAsProgress() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = FIXED_TODAY;
         User user = new User(1L, "u", WordLevel.N4, "AAAA1111");
         User buddy = new User(2L, "b", WordLevel.N4, "BBBB2222");
         Word word = new Word("あ", "あ", WordLevel.N4);
@@ -462,7 +471,7 @@ class TsunTsunServiceTest {
 
     @Test
     void getTodayTsunTsuns_sendOnlyDoesNotIncreaseProgress() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = FIXED_TODAY;
         User user = new User(1L, "u", WordLevel.N4, "AAAA1111");
         User buddy = new User(2L, "b", WordLevel.N4, "BBBB2222");
         Word word = new Word("あ", "あ", WordLevel.N4);
@@ -496,7 +505,7 @@ class TsunTsunServiceTest {
 
     @Test
     void getTodayTsunTsuns_countsRoundTripsUsingMinOfDirectionalAnsweredCounts() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = FIXED_TODAY;
         User user = new User(1L, "u", WordLevel.N4, "AAAA1111");
         User buddy = new User(2L, "b", WordLevel.N4, "BBBB2222");
 
@@ -541,7 +550,7 @@ class TsunTsunServiceTest {
 
     @Test
     void getTodayTsunTsuns_progressUsesMinimumWhenAnsweredCountsAreUnbalanced() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = FIXED_TODAY;
         given(userRepository.existsById(1L)).willReturn(true);
         given(userRepository.existsById(2L)).willReturn(true);
         given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(1L, 2L, BuddyStatus.ACTIVE)).willReturn(true);
@@ -561,7 +570,7 @@ class TsunTsunServiceTest {
 
     @Test
     void getTodayTsunTsuns_progressIsSameWhenUserOrderIsReversed() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = FIXED_TODAY;
         given(userRepository.existsById(1L)).willReturn(true);
         given(userRepository.existsById(2L)).willReturn(true);
         given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(1L, 2L, BuddyStatus.ACTIVE)).willReturn(true);
@@ -585,6 +594,65 @@ class TsunTsunServiceTest {
         assertThat(responseB.progressCount()).isEqualTo(1L);
     }
 
+    @Test
+    void getInbox_usesKstDateBeforeMidnight() {
+        TsunTsunService service = new TsunTsunService(
+                tsunTsunRepository,
+                tsunTsunAnswerRepository,
+                userRepository,
+                buddyRepository,
+                dailyWordItemRepository,
+                dailyWordSetRepository,
+                meaningRepository,
+                tsunTsunQuizService,
+                pushNotificationService,
+                fixedClockAtKst("2026-03-27T23:59:00+09:00")
+        );
+        LocalDate targetDate = LocalDate.of(2026, 3, 27);
+
+        given(userRepository.existsById(2L)).willReturn(true);
+        given(tsunTsunRepository.findByReceiverIdAndTargetDateAndStatusOrderByCreatedAtDesc(2L, targetDate, TsunTsunStatus.SENT))
+                .willReturn(List.of());
+
+        TsunTsunInboxResponse response = service.getInbox(2L);
+
+        assertThat(response.userId()).isEqualTo(2L);
+        assertThat(response.unansweredCount()).isEqualTo(0);
+    }
+
+    @Test
+    void getTodayTsunTsuns_usesKstDateAfterMidnight() {
+        TsunTsunService service = new TsunTsunService(
+                tsunTsunRepository,
+                tsunTsunAnswerRepository,
+                userRepository,
+                buddyRepository,
+                dailyWordItemRepository,
+                dailyWordSetRepository,
+                meaningRepository,
+                tsunTsunQuizService,
+                pushNotificationService,
+                fixedClockAtKst("2026-03-28T00:00:00+09:00")
+        );
+        LocalDate targetDate = LocalDate.of(2026, 3, 28);
+
+        given(userRepository.existsById(1L)).willReturn(true);
+        given(userRepository.existsById(2L)).willReturn(true);
+        given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(1L, 2L, BuddyStatus.ACTIVE)).willReturn(true);
+        given(buddyRepository.existsByUserIdAndBuddyUserIdAndStatus(2L, 1L, BuddyStatus.ACTIVE)).willReturn(true);
+
+        DailyWordSet buddySet = mock(DailyWordSet.class);
+        given(dailyWordSetRepository.findWithItemsByUserIdAndTargetDate(2L, targetDate)).willReturn(Optional.of(buddySet));
+        given(buddySet.getItems()).willReturn(List.of());
+        given(tsunTsunRepository.findPairByTargetDate(1L, 2L, targetDate)).willReturn(List.of());
+        given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDateAndStatus(1L, 2L, targetDate, TsunTsunStatus.ANSWERED)).willReturn(0L);
+        given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDateAndStatus(2L, 1L, targetDate, TsunTsunStatus.ANSWERED)).willReturn(0L);
+
+        var response = service.getTodayTsunTsuns(1L, 2L);
+
+        assertThat(response.targetDate()).isEqualTo(targetDate);
+    }
+
     private DailyWordItem mockDailyWordItem(Long id, User receiver, LocalDate targetDate) {
         DailyWordItem item = mock(DailyWordItem.class);
         DailyWordSet set = mock(DailyWordSet.class);
@@ -596,5 +664,9 @@ class TsunTsunServiceTest {
         given(set.getUser()).willReturn(receiver);
         given(set.getTargetDate()).willReturn(targetDate);
         return item;
+    }
+
+    private Clock fixedClockAtKst(String isoOffsetDateTime) {
+        return Clock.fixed(OffsetDateTime.parse(isoOffsetDateTime).toInstant(), KST);
     }
 }
