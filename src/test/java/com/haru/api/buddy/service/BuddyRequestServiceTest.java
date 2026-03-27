@@ -20,6 +20,9 @@ import com.haru.api.tsuntsun.repository.TsunTsunRepository;
 import com.haru.api.user.domain.User;
 import com.haru.api.user.repository.UserRepository;
 import com.haru.api.word.domain.WordLevel;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -227,7 +230,8 @@ class BuddyRequestServiceTest {
                 buddyRepository,
                 buddyRequestRepository,
                 tsunTsunRepository,
-                userRepository
+                userRepository,
+                Clock.fixed(Instant.parse("2026-03-27T15:00:00Z"), ZoneId.of("Asia/Seoul"))
         );
         BuddyRequestService acceptService = new BuddyRequestService(
                 buddyRequestRepository,

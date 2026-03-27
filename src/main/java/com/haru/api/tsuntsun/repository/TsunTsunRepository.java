@@ -27,6 +27,14 @@ public interface TsunTsunRepository extends JpaRepository<TsunTsun, Long> {
             TsunTsunStatus status
     );
 
+    boolean existsByBuddyRelationshipIdAndSenderIdAndReceiverIdAndTargetDateAndStatus(
+            Long buddyRelationshipId,
+            Long senderId,
+            Long receiverId,
+            LocalDate targetDate,
+            TsunTsunStatus status
+    );
+
     boolean existsBySenderIdAndReceiverIdAndTargetDateAndStatus(
             Long senderId,
             Long receiverId,
@@ -54,6 +62,14 @@ public interface TsunTsunRepository extends JpaRepository<TsunTsun, Long> {
 
     @EntityGraph(attributePaths = {"word"})
     Optional<TsunTsun> findWithWordById(Long id);
+
+    Optional<TsunTsun> findTopByBuddyRelationshipIdAndSenderIdAndReceiverIdOrderByCreatedAtDesc(
+            Long buddyRelationshipId,
+            Long senderId,
+            Long receiverId
+    );
+
+    Optional<TsunTsun> findTopByBuddyRelationshipIdOrderByCreatedAtDesc(Long buddyRelationshipId);
 
     @EntityGraph(attributePaths = {"sender", "word"})
     List<TsunTsun> findByReceiverIdAndTargetDateAndStatusOrderByCreatedAtDesc(

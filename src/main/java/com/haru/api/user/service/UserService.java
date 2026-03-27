@@ -2,6 +2,7 @@ package com.haru.api.user.service;
 
 import com.haru.api.user.domain.User;
 import com.haru.api.user.dto.UpdateLearningLevelResponse;
+import com.haru.api.user.dto.UpdatePetalNotificationsResponse;
 import com.haru.api.user.dto.UpdateProfileImageResponse;
 import com.haru.api.user.dto.UpdateRandomMatchingResponse;
 import com.haru.api.user.dto.UserBuddyCodeResponse;
@@ -43,6 +44,14 @@ public class UserService {
 
         user.changeRandomMatchingEnabled(enabled);
         return UpdateRandomMatchingResponse.from(user);
+    }
+
+    @Transactional
+    public UpdatePetalNotificationsResponse updatePetalNotificationsEnabled(Long userId, boolean enabled) {
+        User user = findUserOrThrow(userId);
+
+        user.changePetalNotificationsEnabled(enabled);
+        return UpdatePetalNotificationsResponse.from(user);
     }
 
     @Transactional

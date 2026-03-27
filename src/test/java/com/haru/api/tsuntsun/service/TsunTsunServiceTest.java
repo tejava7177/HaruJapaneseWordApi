@@ -31,6 +31,7 @@ import com.haru.api.word.domain.WordLevel;
 import com.haru.api.word.repository.MeaningRepository;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -169,7 +170,7 @@ class TsunTsunServiceTest {
         Word word = item.getWord();
         TsunTsun saved = testTsunTsun(sender, buddyC, word, item, 30L, today);
         ReflectionTestUtils.setField(saved, "id", 99L);
-        given(tsunTsunRepository.save(ArgumentMatchers.any(TsunTsun.class))).willReturn(saved);
+        given(tsunTsunRepository.saveAndFlush(ArgumentMatchers.any(TsunTsun.class))).willReturn(saved);
         given(tsunTsunQuizService.generateChoices(word)).willReturn(List.of(new QuizChoiceResponse(1L, "뜻")));
 
         assertThatThrownBy(() -> tsunTsunService.sendTsunTsun(1L, 2L, 11L))
@@ -223,12 +224,12 @@ class TsunTsunServiceTest {
         Word sendWord = item.getWord();
         TsunTsun saved = testTsunTsun(sender, receiver, sendWord, item, 10L, today);
         ReflectionTestUtils.setField(saved, "id", 88L);
-        given(tsunTsunRepository.save(ArgumentMatchers.any(TsunTsun.class))).willReturn(saved);
+        given(tsunTsunRepository.saveAndFlush(ArgumentMatchers.any(TsunTsun.class))).willReturn(saved);
         given(tsunTsunQuizService.generateChoices(sendWord)).willReturn(List.of(new QuizChoiceResponse(501L, "정답")));
 
         TsunTsunQuizResponse next = tsunTsunService.sendTsunTsun(1L, 2L, 11L);
         assertThat(next.tsuntsunId()).isEqualTo(88L);
-        verify(pushNotificationService).notifyTsunTsunReceived(2L, 88L, 1L);
+        verify(pushNotificationService).notifyTsunTsunReceived(2L, 88L, 1L, "s");
     }
 
     @Test
@@ -269,13 +270,13 @@ class TsunTsunServiceTest {
 
         TsunTsun saved = testTsunTsun(userB, userA, sendWord, sendItem, 10L, today);
         ReflectionTestUtils.setField(saved, "id", 77L);
-        given(tsunTsunRepository.save(ArgumentMatchers.any(TsunTsun.class))).willReturn(saved);
+        given(tsunTsunRepository.saveAndFlush(ArgumentMatchers.any(TsunTsun.class))).willReturn(saved);
         given(tsunTsunQuizService.generateChoices(sendWord)).willReturn(List.of(new QuizChoiceResponse(601L, "뜻")));
 
         TsunTsunQuizResponse response = tsunTsunService.sendTsunTsun(2L, 1L, 12L);
 
         assertThat(response.tsuntsunId()).isEqualTo(77L);
-        verify(pushNotificationService).notifyTsunTsunReceived(1L, 77L, 2L);
+        verify(pushNotificationService).notifyTsunTsunReceived(1L, 77L, 2L, "b");
     }
 
     private Buddy mockActiveBuddy(User user, User buddyUser, Long relationshipId) {
@@ -296,7 +297,9 @@ class TsunTsunServiceTest {
     ) {
         BuddyRelationship relationship = BuddyRelationship.create();
         ReflectionTestUtils.setField(relationship, "id", relationshipId);
-        return TsunTsun.sent(sender, receiver, word, item, relationship, targetDate);
+        TsunTsun tsunTsun = TsunTsun.sent(sender, receiver, word, item, relationship, targetDate);
+        ReflectionTestUtils.setField(tsunTsun, "createdAt", LocalDateTime.of(targetDate, java.time.LocalTime.NOON));
+        return tsunTsun;
     }
 
     @Test
@@ -467,6 +470,7 @@ class TsunTsunServiceTest {
         assertThat(response.pairCompletedToday()).isFalse();
         assertThat(response.sentCount()).isEqualTo(1L);
         assertThat(response.receivedCount()).isEqualTo(0L);
+        assertThat(response.hasUnreadPetal()).isFalse();
     }
 
     @Test
@@ -501,6 +505,7 @@ class TsunTsunServiceTest {
         assertThat(response.pairCompletedToday()).isFalse();
         assertThat(response.sentCount()).isEqualTo(1L);
         assertThat(response.receivedCount()).isEqualTo(0L);
+        assertThat(response.hasUnreadPetal()).isFalse();
     }
 
     @Test

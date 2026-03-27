@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.any;
 
 import com.haru.api.user.domain.User;
 import com.haru.api.user.dto.UpdateLearningLevelResponse;
+import com.haru.api.user.dto.UpdatePetalNotificationsResponse;
 import com.haru.api.user.dto.UpdateProfileImageResponse;
 import com.haru.api.user.dto.UserBuddyCodeResponse;
 import com.haru.api.user.dto.UserProfileResponse;
@@ -149,6 +150,7 @@ class UserServiceTest {
         assertThat(response.instagramId()).isEqualTo("@minsung_jp");
         assertThat(response.buddyCode()).isEqualTo("8TR4XK6N");
         assertThat(response.randomMatchingEnabled()).isTrue();
+        assertThat(response.petalNotificationsEnabled()).isTrue();
         assertThat(response.profileImageUrl()).isEqualTo("https://cdn.haru.app/profiles/2.png");
     }
 
@@ -160,7 +162,20 @@ class UserServiceTest {
         UserProfileResponse response = userService.getUserProfile(3L);
 
         assertThat(response.userId()).isEqualTo(3L);
+        assertThat(response.petalNotificationsEnabled()).isTrue();
         assertThat(response.profileImageUrl()).isNull();
+    }
+
+    @Test
+    void updatePetalNotifications_updatesUserSetting() {
+        User user = new User(4L, "buddy4", WordLevel.N4, "BUDDY004", null, null, null, false, true);
+        given(userRepository.findById(4L)).willReturn(Optional.of(user));
+
+        UpdatePetalNotificationsResponse response = userService.updatePetalNotificationsEnabled(4L, false);
+
+        assertThat(response.userId()).isEqualTo(4L);
+        assertThat(response.petalNotificationsEnabled()).isFalse();
+        assertThat(user.isPetalNotificationsEnabled()).isFalse();
     }
 
     @Test

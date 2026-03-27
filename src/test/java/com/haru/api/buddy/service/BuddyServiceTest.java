@@ -21,6 +21,11 @@ import com.haru.api.tsuntsun.repository.TsunTsunRepository;
 import com.haru.api.user.domain.User;
 import com.haru.api.user.repository.UserRepository;
 import com.haru.api.word.domain.WordLevel;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -57,7 +62,8 @@ class BuddyServiceTest {
                 buddyRepository,
                 buddyRequestRepository,
                 tsunTsunRepository,
-                userRepository
+                userRepository,
+                Clock.fixed(Instant.parse("2026-03-27T15:00:00Z"), ZoneId.of("Asia/Seoul"))
         );
     }
 
@@ -83,6 +89,7 @@ class BuddyServiceTest {
         assertThat(response.buddyUserId()).isEqualTo(2L);
         assertThat(response.status()).isEqualTo(BuddyStatus.ACTIVE);
         assertThat(response.tikiTakaCount()).isEqualTo(0L);
+        assertThat(response.hasUnreadPetal()).isFalse();
     }
 
     @Test
@@ -108,6 +115,12 @@ class BuddyServiceTest {
                 10L, 1L, 2L, TsunTsunStatus.ANSWERED)).willReturn(0L);
         given(tsunTsunRepository.countByBuddyRelationshipIdAndSenderIdAndReceiverIdAndStatus(
                 10L, 2L, 1L, TsunTsunStatus.ANSWERED)).willReturn(0L);
+        given(tsunTsunRepository.existsByBuddyRelationshipIdAndSenderIdAndReceiverIdAndTargetDateAndStatus(
+                10L, 2L, 1L, LocalDate.of(2026, 3, 28), TsunTsunStatus.SENT)).willReturn(false);
+        given(tsunTsunRepository.findTopByBuddyRelationshipIdAndSenderIdAndReceiverIdOrderByCreatedAtDesc(10L, 2L, 1L))
+                .willReturn(java.util.Optional.empty());
+        given(tsunTsunRepository.findTopByBuddyRelationshipIdOrderByCreatedAtDesc(10L))
+                .willReturn(java.util.Optional.empty());
 
         buddyService.connectByBuddyCode(1L, "BBBB2222");
         List<BuddyResponse> responses = buddyService.getBuddies(1L);
@@ -162,11 +175,24 @@ class BuddyServiceTest {
                 30L, 1L, 2L, TsunTsunStatus.ANSWERED)).willReturn(5L);
         given(tsunTsunRepository.countByBuddyRelationshipIdAndSenderIdAndReceiverIdAndStatus(
                 30L, 2L, 1L, TsunTsunStatus.ANSWERED)).willReturn(3L);
+        given(tsunTsunRepository.existsByBuddyRelationshipIdAndSenderIdAndReceiverIdAndTargetDateAndStatus(
+                30L, 2L, 1L, LocalDate.of(2026, 3, 28), TsunTsunStatus.SENT)).willReturn(true);
+        com.haru.api.tsuntsun.domain.TsunTsun lastReceived = org.mockito.Mockito.mock(com.haru.api.tsuntsun.domain.TsunTsun.class);
+        com.haru.api.tsuntsun.domain.TsunTsun lastInteraction = org.mockito.Mockito.mock(com.haru.api.tsuntsun.domain.TsunTsun.class);
+        given(lastReceived.getCreatedAt()).willReturn(LocalDateTime.of(2026, 3, 28, 9, 30));
+        given(lastInteraction.getCreatedAt()).willReturn(LocalDateTime.of(2026, 3, 28, 10, 0));
+        given(tsunTsunRepository.findTopByBuddyRelationshipIdAndSenderIdAndReceiverIdOrderByCreatedAtDesc(30L, 2L, 1L))
+                .willReturn(java.util.Optional.of(lastReceived));
+        given(tsunTsunRepository.findTopByBuddyRelationshipIdOrderByCreatedAtDesc(30L))
+                .willReturn(java.util.Optional.of(lastInteraction));
 
         List<BuddyResponse> responses = buddyService.getBuddies(1L);
 
         assertThat(responses).hasSize(1);
         assertThat(responses.get(0).tikiTakaCount()).isEqualTo(3L);
+        assertThat(responses.get(0).hasUnreadPetal()).isTrue();
+        assertThat(responses.get(0).lastReceivedAt()).isEqualTo(LocalDateTime.of(2026, 3, 28, 9, 30));
+        assertThat(responses.get(0).lastInteractionAt()).isEqualTo(LocalDateTime.of(2026, 3, 28, 10, 0));
     }
 
     @Test

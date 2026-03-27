@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.haru.api.user.dto.UpdateLearningLevelResponse;
+import com.haru.api.user.dto.UpdatePetalNotificationsResponse;
 import com.haru.api.user.dto.UpdateProfileImageResponse;
 import com.haru.api.user.dto.UpdateRandomMatchingResponse;
 import com.haru.api.user.dto.UserBuddyCodeResponse;
@@ -44,6 +45,7 @@ class UserControllerTest {
                 "@minsung_jp",
                 "8TR4XK6N",
                 true,
+                true,
                 "https://cdn.haru.app/profiles/2.png"
         );
         given(userService.getUserProfile(2L)).willReturn(response);
@@ -57,6 +59,7 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.instagramId").value("@minsung_jp"))
                 .andExpect(jsonPath("$.buddyCode").value("8TR4XK6N"))
                 .andExpect(jsonPath("$.randomMatchingEnabled").value(true))
+                .andExpect(jsonPath("$.petalNotificationsEnabled").value(true))
                 .andExpect(jsonPath("$.profileImageUrl").value("https://cdn.haru.app/profiles/2.png"));
     }
 
@@ -70,6 +73,7 @@ class UserControllerTest {
                 "@haru_jp",
                 "HARU0003",
                 false,
+                true,
                 null
         );
         given(userService.getUserProfile(3L)).willReturn(response);
@@ -156,6 +160,21 @@ class UserControllerTest {
     }
 
     @Test
+    void updatePetalNotifications_returnsUpdatedUser() throws Exception {
+        UpdatePetalNotificationsResponse response = new UpdatePetalNotificationsResponse(4L, false);
+        given(userService.updatePetalNotificationsEnabled(4L, false)).willReturn(response);
+
+        mockMvc.perform(patch("/api/users/4/petal-notifications")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"enabled":false}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(4))
+                .andExpect(jsonPath("$.petalNotificationsEnabled").value(false));
+    }
+
+    @Test
     void updateUserProfile_returnsUpdatedProfile() throws Exception {
         UserProfileResponse response = new UserProfileResponse(
                 1L,
@@ -165,6 +184,7 @@ class UserControllerTest {
                 "@minsung_jp",
                 "4C4AFKN2",
                 false,
+                true,
                 null
         );
         given(userService.updateUserProfile(1L, "심주흔", "매일 한 문장씩 일본어 연습 중", "@minsung_jp"))

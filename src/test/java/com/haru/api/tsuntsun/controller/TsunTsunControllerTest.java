@@ -18,6 +18,7 @@ import com.haru.api.tsuntsun.dto.TsunTsunTodayResponse;
 import com.haru.api.tsuntsun.dto.TsunTsunTodayStatus;
 import com.haru.api.tsuntsun.service.TsunTsunService;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -152,6 +153,9 @@ class TsunTsunControllerTest {
                 10,
                 3,
                 2,
+                true,
+                LocalDateTime.of(2026, 3, 10, 9, 0),
+                LocalDateTime.of(2026, 3, 10, 9, 30),
                 false,
                 List.of(new TsunTsunTodayItemResponse(101L, 201L, TsunTsunDirection.SENT, TsunTsunTodayStatus.ANSWERED))
         );
@@ -164,6 +168,7 @@ class TsunTsunControllerTest {
                 .andExpect(jsonPath("$.progressGoal").value(10))
                 .andExpect(jsonPath("$.sentCount").value(3))
                 .andExpect(jsonPath("$.receivedCount").value(2))
+                .andExpect(jsonPath("$.hasUnreadPetal").value(true))
                 .andExpect(jsonPath("$.pairCompletedToday").value(false))
                 .andExpect(jsonPath("$.items[0].direction").value("SENT"));
     }

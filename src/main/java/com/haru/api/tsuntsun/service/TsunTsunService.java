@@ -30,6 +30,7 @@ import com.haru.api.word.domain.Word;
 import com.haru.api.word.repository.MeaningRepository;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -37,6 +38,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -133,13 +136,29 @@ public class TsunTsunService {
 
         Word word = dailyWordItem.getWord();
         BuddyRelationship buddyRelationship = buddy.getBuddyRelationship();
-        TsunTsun saved = tsunTsunRepository.save(TsunTsun.sent(sender, receiver, word, dailyWordItem, buddyRelationship, today));
+        TsunTsun saved = tsunTsunRepository.saveAndFlush(TsunTsun.sent(sender, receiver, word, dailyWordItem, buddyRelationship, today));
 
         log.info("[tsuntsun/send] send created: tsuntsunId={}, senderId={}, receiverId={}, targetDate={}",
                 saved.getId(), senderId, receiverId, today);
 
         List<QuizChoiceResponse> choices = tsunTsunQuizService.generateChoices(word);
-        pushNotificationService.notifyTsunTsunReceived(receiverId, saved.getId(), senderId);
+        Runnable pushTask = () -> pushNotificationService.notifyTsunTsunReceived(
+                receiverId,
+                saved.getId(),
+                senderId,
+                sender.getNickname()
+        );
+        if (TransactionSynchronizationManager.isActualTransactionActive()
+                && TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    pushTask.run();
+                }
+            });
+        } else {
+            pushTask.run();
+        }
 
         return TsunTsunQuizResponse.from(saved, choices);
     }
@@ -256,6 +275,19 @@ public class TsunTsunService {
             long receivedCount = pairTsuns.stream()
                     .filter(t -> t.getSender().getId().equals(buddyId) && t.getReceiver().getId().equals(userId))
                     .count();
+            boolean hasUnreadPetal = pairTsuns.stream()
+                    .anyMatch(t -> t.getSender().getId().equals(buddyId)
+                            && t.getReceiver().getId().equals(userId)
+                            && t.getStatus() == TsunTsunStatus.SENT);
+            LocalDateTime lastReceivedAt = pairTsuns.stream()
+                    .filter(t -> t.getSender().getId().equals(buddyId) && t.getReceiver().getId().equals(userId))
+                    .map(TsunTsun::getCreatedAt)
+                    .max(LocalDateTime::compareTo)
+                    .orElse(null);
+            LocalDateTime lastInteractionAt = pairTsuns.stream()
+                    .map(TsunTsun::getCreatedAt)
+                    .max(LocalDateTime::compareTo)
+                    .orElse(null);
             long progressCount = getPairProgressCount(userId, buddyId, today);
             boolean pairCompletedToday = progressCount >= PAIR_PROGRESS_GOAL;
 
@@ -314,6 +346,9 @@ public class TsunTsunService {
                     PAIR_PROGRESS_GOAL,
                     sentCount,
                     receivedCount,
+                    hasUnreadPetal,
+                    lastReceivedAt,
+                    lastInteractionAt,
                     pairCompletedToday,
                     items
             );

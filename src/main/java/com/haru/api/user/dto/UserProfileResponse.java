@@ -11,6 +11,7 @@ public record UserProfileResponse(
         String instagramId,
         String buddyCode,
         boolean randomMatchingEnabled,
+        boolean petalNotificationsEnabled,
         String profileImageUrl
 ) {
     public static UserProfileResponse from(User user) {
@@ -22,6 +23,7 @@ public record UserProfileResponse(
                 user.getInstagramId(),
                 user.getBuddyCode(),
                 user.isRandomMatchingEnabled(),
+                user.isPetalNotificationsEnabled(),
                 user.getProfileImageUrl()
         );
     }

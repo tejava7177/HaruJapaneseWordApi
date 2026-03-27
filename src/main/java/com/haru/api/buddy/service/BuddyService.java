@@ -13,6 +13,9 @@ import com.haru.api.tsuntsun.domain.TsunTsunStatus;
 import com.haru.api.tsuntsun.repository.TsunTsunRepository;
 import com.haru.api.user.domain.User;
 import com.haru.api.user.repository.UserRepository;
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -34,6 +37,7 @@ public class BuddyService {
     private final BuddyRequestRepository buddyRequestRepository;
     private final TsunTsunRepository tsunTsunRepository;
     private final UserRepository userRepository;
+    private final Clock clock;
 
     public List<BuddyResponse> getBuddies(Long userId) {
         ensureUserExists(userId);
@@ -136,11 +140,12 @@ public class BuddyService {
                 relationshipId, user.getId(), buddyUser.getId()
         );
 
-        return BuddyResponse.from(userToBuddy, 0L);
+        return BuddyResponse.from(userToBuddy, 0L, false, null, null);
     }
 
     private BuddyResponse toBuddyResponse(Buddy buddy) {
         Long buddyRelationshipId = buddy.getBuddyRelationship().getId();
+        LocalDate today = LocalDate.now(clock);
         long answeredToBuddyCount = tsunTsunRepository.countByBuddyRelationshipIdAndSenderIdAndReceiverIdAndStatus(
                 buddyRelationshipId,
                 buddy.getUser().getId(),
@@ -154,7 +159,25 @@ public class BuddyService {
                 TsunTsunStatus.ANSWERED
         );
         long tikiTakaCount = Math.min(answeredToBuddyCount, answeredFromBuddyCount);
-        return BuddyResponse.from(buddy, tikiTakaCount);
+        boolean hasUnreadPetal = tsunTsunRepository.existsByBuddyRelationshipIdAndSenderIdAndReceiverIdAndTargetDateAndStatus(
+                buddyRelationshipId,
+                buddy.getBuddyUser().getId(),
+                buddy.getUser().getId(),
+                today,
+                TsunTsunStatus.SENT
+        );
+        LocalDateTime lastReceivedAt = tsunTsunRepository
+                .findTopByBuddyRelationshipIdAndSenderIdAndReceiverIdOrderByCreatedAtDesc(
+                        buddyRelationshipId,
+                        buddy.getBuddyUser().getId(),
+                        buddy.getUser().getId()
+                )
+                .map(com.haru.api.tsuntsun.domain.TsunTsun::getCreatedAt)
+                .orElse(null);
+        LocalDateTime lastInteractionAt = tsunTsunRepository.findTopByBuddyRelationshipIdOrderByCreatedAtDesc(buddyRelationshipId)
+                .map(com.haru.api.tsuntsun.domain.TsunTsun::getCreatedAt)
+                .orElse(null);
+        return BuddyResponse.from(buddy, tikiTakaCount, hasUnreadPetal, lastReceivedAt, lastInteractionAt);
     }
 
     private void validateBuddyLimit(Long userId) {

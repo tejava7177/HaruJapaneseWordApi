@@ -2,6 +2,8 @@ package com.haru.api.user.controller;
 
 import com.haru.api.user.dto.UpdateLearningLevelRequest;
 import com.haru.api.user.dto.UpdateLearningLevelResponse;
+import com.haru.api.user.dto.UpdatePetalNotificationsRequest;
+import com.haru.api.user.dto.UpdatePetalNotificationsResponse;
 import com.haru.api.user.dto.UpdateProfileImageResponse;
 import com.haru.api.user.dto.UpdateRandomMatchingRequest;
 import com.haru.api.user.dto.UpdateRandomMatchingResponse;
@@ -60,6 +62,15 @@ public class UserController {
             @Valid @RequestBody UpdateRandomMatchingRequest request
     ) {
         return userService.updateRandomMatchingEnabled(userId, request.enabled());
+    }
+
+    @PatchMapping("/{userId}/petal-notifications")
+    @Operation(summary = "꽃잎 알림 설정 변경")
+    public UpdatePetalNotificationsResponse updatePetalNotifications(
+            @PathVariable Long userId,
+            @Valid @RequestBody UpdatePetalNotificationsRequest request
+    ) {
+        return userService.updatePetalNotificationsEnabled(userId, request.enabled());
     }
 
     @PatchMapping("/{userId}/profile")

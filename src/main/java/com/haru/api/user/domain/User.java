@@ -44,6 +44,9 @@ public class User {
     @Column(name = "random_matching_enabled", nullable = false)
     private boolean randomMatchingEnabled;
 
+    @Column(name = "petal_notifications_enabled", nullable = false)
+    private boolean petalNotificationsEnabled;
+
     @Column(name = "apple_subject", unique = true)
     private String appleSubject;
 
@@ -61,11 +64,11 @@ public class User {
     private LocalDateTime updatedAt;
 
     public User(Long id, String nickname, WordLevel learningLevel) {
-        this(id, nickname, learningLevel, null, null, null, null, false, null, null, null, null);
+        this(id, nickname, learningLevel, null, null, null, null, false, true, null, null, null, null);
     }
 
     public User(Long id, String nickname, WordLevel learningLevel, String buddyCode) {
-        this(id, nickname, learningLevel, buddyCode, null, null, null, false, null, null, null, null);
+        this(id, nickname, learningLevel, buddyCode, null, null, null, false, true, null, null, null, null);
     }
 
     public User(
@@ -79,7 +82,52 @@ public class User {
             boolean randomMatchingEnabled
     ) {
         this(id, nickname, learningLevel, buddyCode, profileImageUrl, instagramId, bio, randomMatchingEnabled,
-                null, null, null, null);
+                true, null, null, null, null);
+    }
+
+    public User(
+            Long id,
+            String nickname,
+            WordLevel learningLevel,
+            String buddyCode,
+            String profileImageUrl,
+            String instagramId,
+            String bio,
+            boolean randomMatchingEnabled,
+            boolean petalNotificationsEnabled
+    ) {
+        this(id, nickname, learningLevel, buddyCode, profileImageUrl, instagramId, bio, randomMatchingEnabled,
+                petalNotificationsEnabled, null, null, null, null);
+    }
+
+    public User(
+            Long id,
+            String nickname,
+            WordLevel learningLevel,
+            String buddyCode,
+            String profileImageUrl,
+            String instagramId,
+            String bio,
+            boolean randomMatchingEnabled,
+            boolean petalNotificationsEnabled,
+            String appleSubject,
+            String authEmail,
+            String displayName,
+            LocalDateTime lastLoginAt
+    ) {
+        this.id = id;
+        this.nickname = nickname;
+        this.learningLevel = learningLevel;
+        this.buddyCode = buddyCode;
+        this.profileImageUrl = profileImageUrl;
+        this.instagramId = instagramId;
+        this.bio = bio;
+        this.randomMatchingEnabled = randomMatchingEnabled;
+        this.petalNotificationsEnabled = petalNotificationsEnabled;
+        this.appleSubject = appleSubject;
+        this.authEmail = authEmail;
+        this.displayName = displayName;
+        this.lastLoginAt = lastLoginAt;
     }
 
     public User(
@@ -96,18 +144,8 @@ public class User {
             String displayName,
             LocalDateTime lastLoginAt
     ) {
-        this.id = id;
-        this.nickname = nickname;
-        this.learningLevel = learningLevel;
-        this.buddyCode = buddyCode;
-        this.profileImageUrl = profileImageUrl;
-        this.instagramId = instagramId;
-        this.bio = bio;
-        this.randomMatchingEnabled = randomMatchingEnabled;
-        this.appleSubject = appleSubject;
-        this.authEmail = authEmail;
-        this.displayName = displayName;
-        this.lastLoginAt = lastLoginAt;
+        this(id, nickname, learningLevel, buddyCode, profileImageUrl, instagramId, bio, randomMatchingEnabled,
+                true, appleSubject, authEmail, displayName, lastLoginAt);
     }
 
     public void changeLearningLevel(WordLevel learningLevel) {
@@ -116,6 +154,10 @@ public class User {
 
     public void changeRandomMatchingEnabled(boolean randomMatchingEnabled) {
         this.randomMatchingEnabled = randomMatchingEnabled;
+    }
+
+    public void changePetalNotificationsEnabled(boolean petalNotificationsEnabled) {
+        this.petalNotificationsEnabled = petalNotificationsEnabled;
     }
 
     public void changeProfileImageUrl(String profileImageUrl) {

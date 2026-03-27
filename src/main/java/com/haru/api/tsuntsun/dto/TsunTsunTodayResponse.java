@@ -1,6 +1,7 @@
 package com.haru.api.tsuntsun.dto;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public record TsunTsunTodayResponse(
@@ -11,6 +12,9 @@ public record TsunTsunTodayResponse(
         long progressGoal,
         long sentCount,
         long receivedCount,
+        boolean hasUnreadPetal,
+        LocalDateTime lastReceivedAt,
+        LocalDateTime lastInteractionAt,
         boolean pairCompletedToday,
         List<TsunTsunTodayItemResponse> items
 ) {
