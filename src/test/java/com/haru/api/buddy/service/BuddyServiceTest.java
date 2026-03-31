@@ -202,6 +202,50 @@ class BuddyServiceTest {
     }
 
     @Test
+    void getBuddies_mapsBuddyUserLastActiveAt() {
+        User user = new User(1L, "a", WordLevel.N4, "AAAA1111");
+        User buddy = new User(
+                2L,
+                "b",
+                WordLevel.N3,
+                "BBBB2222",
+                null,
+                null,
+                null,
+                false,
+                true,
+                null,
+                null,
+                null,
+                null,
+                LocalDateTime.of(2026, 3, 31, 10, 15, 30)
+        );
+        BuddyRelationship relationship = BuddyRelationship.create();
+        ReflectionTestUtils.setField(relationship, "id", 30L);
+        Buddy userToBuddy = Buddy.active(user, buddy, relationship);
+        ReflectionTestUtils.setField(userToBuddy, "id", 100L);
+
+        given(userRepository.existsById(1L)).willReturn(true);
+        given(buddyRepository.findByUserIdAndStatusOrderByCreatedAtAsc(1L, BuddyStatus.ACTIVE))
+                .willReturn(List.of(userToBuddy));
+        given(tsunTsunRepository.countByBuddyRelationshipIdAndSenderIdAndReceiverIdAndStatus(
+                30L, 1L, 2L, TsunTsunStatus.ANSWERED)).willReturn(0L);
+        given(tsunTsunRepository.countByBuddyRelationshipIdAndSenderIdAndReceiverIdAndStatus(
+                30L, 2L, 1L, TsunTsunStatus.ANSWERED)).willReturn(0L);
+        given(tsunTsunRepository.existsByBuddyRelationshipIdAndSenderIdAndReceiverIdAndTargetDateAndStatus(
+                30L, 2L, 1L, LocalDate.of(2026, 3, 28), TsunTsunStatus.SENT)).willReturn(false);
+        given(tsunTsunRepository.findTopByBuddyRelationshipIdAndSenderIdAndReceiverIdOrderByCreatedAtDesc(30L, 2L, 1L))
+                .willReturn(java.util.Optional.empty());
+        given(tsunTsunRepository.findTopByBuddyRelationshipIdOrderByCreatedAtDesc(30L))
+                .willReturn(java.util.Optional.empty());
+
+        List<BuddyResponse> responses = buddyService.getBuddies(1L);
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).lastActiveAt()).isEqualTo(LocalDateTime.of(2026, 3, 31, 10, 15, 30));
+    }
+
+    @Test
     void removeBuddy_deletesBothDirections() {
         User user = new User(1L, "a", WordLevel.N4, "AAAA1111");
         User buddy = new User(2L, "b", WordLevel.N4, "BBBB2222");
