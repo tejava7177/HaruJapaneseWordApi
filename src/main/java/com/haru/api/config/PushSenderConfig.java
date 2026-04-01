@@ -3,6 +3,7 @@ package com.haru.api.config;
 import com.haru.api.push.ApnsPushSender;
 import com.haru.api.push.NoopPushSender;
 import com.haru.api.push.PushSender;
+import com.haru.api.userdevice.service.UserDeviceTokenService;
 import java.net.http.HttpClient;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -27,7 +28,11 @@ public class PushSenderConfig {
     }
 
     @Bean
-    public PushSender pushSender(ApnsProperties apnsProperties, HttpClient apnsHttpClient) {
+    public PushSender pushSender(
+            ApnsProperties apnsProperties,
+            HttpClient apnsHttpClient,
+            UserDeviceTokenService userDeviceTokenService
+    ) {
         if (!apnsProperties.enabled()) {
             return new NoopPushSender();
         }
@@ -44,7 +49,7 @@ public class PushSenderConfig {
         }
 
         try {
-            return new ApnsPushSender(apnsProperties, apnsHttpClient);
+            return new ApnsPushSender(apnsProperties, apnsHttpClient, userDeviceTokenService);
         } catch (RuntimeException exception) {
             log.warn("[Push] APNs sender disabled reason=initialization_failed message={}",
                     exception.getMessage(), exception);

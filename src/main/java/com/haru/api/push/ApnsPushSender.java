@@ -1,6 +1,7 @@
 package com.haru.api.push;
 
 import com.haru.api.config.ApnsProperties;
+import com.haru.api.userdevice.service.UserDeviceTokenService;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -14,10 +15,13 @@ import java.security.KeyFactory;
 import java.security.PrivateKey;
 import java.security.Signature;
 import java.security.spec.PKCS8EncodedKeySpec;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -26,15 +30,35 @@ public class ApnsPushSender implements PushSender {
     private static final Base64.Encoder BASE64_URL_ENCODER = Base64.getUrlEncoder().withoutPadding();
     private static final String APNS_PRODUCTION_URL = "https://api.push.apple.com";
     private static final String APNS_SANDBOX_URL = "https://api.sandbox.push.apple.com";
+    private static final Duration PROVIDER_TOKEN_REFRESH_INTERVAL = Duration.ofMinutes(50);
+    private static final Set<String> PERMANENT_FAILURE_REASONS = Set.of(
+            "BadDeviceToken",
+            "Unregistered",
+            "DeviceTokenNotForTopic"
+    );
+    private static final Set<String> TEMPORARY_FAILURE_REASONS = Set.of(
+            "TooManyProviderTokenUpdates",
+            "TooManyRequests",
+            "InternalServerError",
+            "ServiceUnavailable"
+    );
 
     private final ApnsProperties apnsProperties;
     private final HttpClient httpClient;
+    private final UserDeviceTokenService userDeviceTokenService;
     private final PrivateKey privateKey;
     private final String apnsBaseUrl;
+    private final Object providerTokenLock = new Object();
+    private final AtomicReference<CachedProviderToken> cachedProviderToken = new AtomicReference<>();
 
-    public ApnsPushSender(ApnsProperties apnsProperties, HttpClient httpClient) {
+    public ApnsPushSender(
+            ApnsProperties apnsProperties,
+            HttpClient httpClient,
+            UserDeviceTokenService userDeviceTokenService
+    ) {
         this.apnsProperties = apnsProperties;
         this.httpClient = httpClient;
+        this.userDeviceTokenService = userDeviceTokenService;
         this.privateKey = loadPrivateKey(Path.of(apnsProperties.privateKeyPath()));
         this.apnsBaseUrl = apnsProperties.useSandbox() ? APNS_SANDBOX_URL : APNS_PRODUCTION_URL;
     }
@@ -42,7 +66,8 @@ public class ApnsPushSender implements PushSender {
     @Override
     public void send(List<String> deviceTokens, String title, String body, Map<String, String> data) {
         int successCount = 0;
-        int failureCount = 0;
+        int permanentFailureCount = 0;
+        int temporaryFailureCount = 0;
 
         for (String deviceToken : deviceTokens) {
             log.info("[Push] APNs send attempt deviceToken={} topic={} sandbox={}",
@@ -56,20 +81,32 @@ public class ApnsPushSender implements PushSender {
                     continue;
                 }
 
-                failureCount++;
-                log.warn("[Push] APNs send failed deviceToken={} statusCode={} reason={}",
-                        abbreviateToken(deviceToken), response.statusCode(), extractReason(response.body()));
+                ApnsFailure failure = classifyFailure(response.statusCode(), extractReason(response.body()));
+                if (failure.classification() == FailureClassification.PERMANENT) {
+                    permanentFailureCount++;
+                    userDeviceTokenService.disableToken(deviceToken, failure.reason());
+                    log.warn("[Push] APNs send failed deviceToken={} statusCode={} reason={} classification={} tokenDisabled=true",
+                            abbreviateToken(deviceToken), response.statusCode(), failure.reason(), failure.classification().logValue());
+                } else {
+                    temporaryFailureCount++;
+                    log.warn("[Push] APNs send failed deviceToken={} statusCode={} reason={} classification={} tokenDisabled=false",
+                            abbreviateToken(deviceToken), response.statusCode(), failure.reason(), failure.classification().logValue());
+                }
             } catch (IOException | InterruptedException exception) {
-                failureCount++;
+                temporaryFailureCount++;
                 if (exception instanceof InterruptedException) {
                     Thread.currentThread().interrupt();
                 }
-                log.warn("[Push] APNs send failed deviceToken={} statusCode={} reason={}",
-                        abbreviateToken(deviceToken), "IO", exception.getMessage(), exception);
+                log.warn("[Push] APNs send failed deviceToken={} statusCode={} reason={} classification={} tokenDisabled=false",
+                        abbreviateToken(deviceToken), "IO", exception.getMessage(),
+                        FailureClassification.TEMPORARY.logValue(), exception);
             }
         }
 
-        if (successCount == 0 && failureCount > 0) {
+        log.info("[Push] APNs send summary totalTokenCount={} successCount={} permanentFailureCount={} temporaryFailureCount={}",
+                deviceTokens.size(), successCount, permanentFailureCount, temporaryFailureCount);
+
+        if (successCount == 0 && (permanentFailureCount > 0 || temporaryFailureCount > 0)) {
             throw new IllegalStateException("APNs send failed for all device tokens");
         }
     }
@@ -77,8 +114,8 @@ public class ApnsPushSender implements PushSender {
     private HttpRequest buildRequest(String deviceToken, String title, String body, Map<String, String> data) {
         return HttpRequest.newBuilder()
                 .uri(URI.create(apnsBaseUrl + "/3/device/" + deviceToken))
-                .timeout(java.time.Duration.ofSeconds(10))
-                .header("authorization", "bearer " + createJwtToken())
+                .timeout(Duration.ofSeconds(10))
+                .header("authorization", "bearer " + providerToken())
                 .header("apns-topic", apnsProperties.bundleId())
                 .header("apns-push-type", "alert")
                 .header("apns-priority", "10")
@@ -107,14 +144,36 @@ public class ApnsPushSender implements PushSender {
         return payload.toString();
     }
 
-    private String createJwtToken() {
-        long issuedAt = Instant.now().getEpochSecond();
+    private String providerToken() {
+        Instant now = Instant.now();
+        CachedProviderToken currentToken = cachedProviderToken.get();
+        if (currentToken != null && currentToken.isReusableAt(now)) {
+            log.info("[Push] APNs reusing provider token issuedAt={}", currentToken.issuedAtEpochSecond());
+            return currentToken.value();
+        }
+
+        synchronized (providerTokenLock) {
+            CachedProviderToken refreshedCheck = cachedProviderToken.get();
+            if (refreshedCheck != null && refreshedCheck.isReusableAt(now)) {
+                log.info("[Push] APNs reusing provider token issuedAt={}", refreshedCheck.issuedAtEpochSecond());
+                return refreshedCheck.value();
+            }
+
+            CachedProviderToken refreshed = createProviderToken(now);
+            cachedProviderToken.set(refreshed);
+            log.info("[Push] APNs refreshing provider token issuedAt={}", refreshed.issuedAtEpochSecond());
+            return refreshed.value();
+        }
+    }
+
+    private CachedProviderToken createProviderToken(Instant issuedAt) {
+        long issuedAtEpochSecond = issuedAt.getEpochSecond();
         String header = "{\"alg\":\"ES256\",\"kid\":\"" + escapeJson(apnsProperties.keyId()) + "\"}";
-        String payload = "{\"iss\":\"" + escapeJson(apnsProperties.teamId()) + "\",\"iat\":" + issuedAt + "}";
+        String payload = "{\"iss\":\"" + escapeJson(apnsProperties.teamId()) + "\",\"iat\":" + issuedAtEpochSecond + "}";
         String encodedHeader = encodeBase64Url(header);
         String encodedPayload = encodeBase64Url(payload);
         String unsignedToken = encodedHeader + "." + encodedPayload;
-        return unsignedToken + "." + sign(unsignedToken);
+        return new CachedProviderToken(unsignedToken + "." + sign(unsignedToken), issuedAtEpochSecond);
     }
 
     private String sign(String unsignedToken) {
@@ -190,6 +249,19 @@ public class ApnsPushSender implements PushSender {
         return statusCode >= 200 && statusCode < 300;
     }
 
+    private ApnsFailure classifyFailure(int statusCode, String reason) {
+        if (PERMANENT_FAILURE_REASONS.contains(reason)) {
+            return new ApnsFailure(reason, FailureClassification.PERMANENT);
+        }
+        if (TEMPORARY_FAILURE_REASONS.contains(reason)) {
+            return new ApnsFailure(reason, FailureClassification.TEMPORARY);
+        }
+        if (statusCode >= 500 || statusCode == 429) {
+            return new ApnsFailure(reason, FailureClassification.TEMPORARY);
+        }
+        return new ApnsFailure(reason, FailureClassification.TEMPORARY);
+    }
+
     private String extractReason(String responseBody) {
         if (responseBody == null || responseBody.isBlank()) {
             return "unknown";
@@ -219,5 +291,23 @@ public class ApnsPushSender implements PushSender {
         return value
                 .replace("\\", "\\\\")
                 .replace("\"", "\\\"");
+    }
+
+    private record CachedProviderToken(String value, long issuedAtEpochSecond) {
+        private boolean isReusableAt(Instant now) {
+            return now.isBefore(Instant.ofEpochSecond(issuedAtEpochSecond).plus(PROVIDER_TOKEN_REFRESH_INTERVAL));
+        }
+    }
+
+    private record ApnsFailure(String reason, FailureClassification classification) {
+    }
+
+    private enum FailureClassification {
+        PERMANENT,
+        TEMPORARY;
+
+        private String logValue() {
+            return name().toLowerCase();
+        }
     }
 }

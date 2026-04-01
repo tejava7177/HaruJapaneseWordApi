@@ -77,10 +77,30 @@ public class UserDeviceTokenService {
         return userDeviceTokenRepository.existsByUserIdAndPushEnabledTrue(userId);
     }
 
+    @Transactional
+    public void disableToken(String deviceToken, String reason) {
+        String normalizedToken = normalizeDeviceToken(deviceToken);
+
+        userDeviceTokenRepository.findByDeviceToken(normalizedToken)
+                .ifPresentOrElse(existingToken -> {
+                    existingToken.unregister();
+                    log.info("[Push] disable device token token={} reason={} userId={}",
+                            abbreviateToken(normalizedToken), reason, existingToken.getUser().getId());
+                }, () -> log.info("[Push] disable device token skipped=not_found token={} reason={}",
+                        abbreviateToken(normalizedToken), reason));
+    }
+
     private String normalizeDeviceToken(String deviceToken) {
         if (deviceToken == null || deviceToken.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "deviceToken is required");
         }
         return deviceToken.trim();
+    }
+
+    private String abbreviateToken(String deviceToken) {
+        if (deviceToken.length() <= 12) {
+            return deviceToken;
+        }
+        return deviceToken.substring(0, 6) + "..." + deviceToken.substring(deviceToken.length() - 6);
     }
 }
