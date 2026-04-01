@@ -8,6 +8,14 @@ services:
       - .env
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      APNS_ENABLED: ${APNS_ENABLED:-true}
+      APNS_KEY_ID: ${APNS_KEY_ID}
+      APNS_TEAM_ID: ${APNS_TEAM_ID}
+      APNS_BUNDLE_ID: ${APNS_BUNDLE_ID}
+      APNS_PRIVATE_KEY_PATH: ${APNS_PRIVATE_KEY_PATH:-/app/keys/AuthKey_9JZU2RBQ4U.p8}
+      APNS_USE_SANDBOX: ${APNS_USE_SANDBOX:-false}
     ports:
       - "8080:8080"
+    volumes:
+      - ./keys:/app/keys:ro
     restart: unless-stopped

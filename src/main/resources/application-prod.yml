@@ -24,6 +24,14 @@ spring:
         jdbc:
           time_zone: UTC
 
+apns:
+  enabled: ${APNS_ENABLED:false}
+  key-id: ${APNS_KEY_ID}
+  team-id: ${APNS_TEAM_ID}
+  bundle-id: ${APNS_BUNDLE_ID}
+  private-key-path: ${APNS_PRIVATE_KEY_PATH}
+  use-sandbox: ${APNS_USE_SANDBOX:false}
+
 management:
   endpoints:
     web:
