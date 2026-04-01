@@ -48,18 +48,25 @@ public class PushNotificationService {
 
     public void notifyTsunTsunReceived(Long targetUserId, Long tsunTsunId, Long senderUserId, String senderName) {
         if (targetUserId.equals(senderUserId)) {
-            log.info("[Push] skip tsuntsun self notification targetUserId={} senderUserId={}", targetUserId, senderUserId);
+            log.info("[Push] notify tsuntsun enter receiverId={} tsunTsunId={} senderUserId={} senderName={} notificationsEnabled={}",
+                    targetUserId, tsunTsunId, senderUserId, senderName, null);
+            log.info("[Push] skip tsuntsun reason=self_notification receiverId={} senderUserId={}", targetUserId, senderUserId);
             return;
         }
 
         User targetUser = userRepository.findById(targetUserId)
                 .orElse(null);
+        Boolean notificationsEnabled = targetUser != null ? targetUser.isPetalNotificationsEnabled() : null;
+        log.info("[Push] notify tsuntsun enter receiverId={} tsunTsunId={} senderUserId={} senderName={} notificationsEnabled={}",
+                targetUserId, tsunTsunId, senderUserId, senderName, notificationsEnabled);
+
         if (targetUser == null) {
-            log.info("[Push] skip tsuntsun target user missing targetUserId={}", targetUserId);
+            log.info("[Push] skip tsuntsun reason=target_user_missing receiverId={}", targetUserId);
             return;
         }
         if (!targetUser.isPetalNotificationsEnabled()) {
-            log.info("[Push] skip tsuntsun notifications disabled targetUserId={}", targetUserId);
+            log.info("[Push] skip tsuntsun reason=petal_notifications_disabled receiverId={} notificationsEnabled={}",
+                    targetUserId, targetUser.isPetalNotificationsEnabled());
             return;
         }
 
@@ -81,11 +88,25 @@ public class PushNotificationService {
             List<String> deviceTokens = userDeviceTokenService.findActiveTokensByUserId(targetUserId);
             logByType(notificationType, targetUserId, deviceTokens.size());
             if (deviceTokens.isEmpty()) {
+                boolean hasAnyToken = userDeviceTokenService.hasAnyToken(targetUserId);
+                boolean hasActiveToken = userDeviceTokenService.hasActiveToken(targetUserId);
+                if (!hasAnyToken) {
+                    log.info("[Push] skip {} reason=no_device_token receiverId={}", notificationType, targetUserId);
+                } else if (!hasActiveToken) {
+                    log.info("[Push] skip {} reason=token_inactive receiverId={}", notificationType, targetUserId);
+                } else {
+                    log.info("[Push] skip {} reason=no_active_token_after_lookup receiverId={}", notificationType, targetUserId);
+                }
                 return;
             }
+            log.info("[Push] send attempt type={} receiverId={} tokenCount={} title={} data={}",
+                    notificationType, targetUserId, deviceTokens.size(), title, data);
             pushSender.send(deviceTokens, title, body, data);
+            log.info("[Push] send success type={} receiverId={} tokenCount={}",
+                    notificationType, targetUserId, deviceTokens.size());
         } catch (RuntimeException exception) {
-            log.warn("[Push] send failed type={} targetUserId={} reason={}", notificationType, targetUserId, exception.getMessage(), exception);
+            log.warn("[Push] send failed type={} receiverId={} reason=sender_exception message={}",
+                    notificationType, targetUserId, exception.getMessage(), exception);
         }
     }
 

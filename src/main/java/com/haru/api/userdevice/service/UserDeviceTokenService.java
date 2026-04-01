@@ -69,6 +69,14 @@ public class UserDeviceTokenService {
                 .toList();
     }
 
+    public boolean hasAnyToken(Long userId) {
+        return userDeviceTokenRepository.existsByUserId(userId);
+    }
+
+    public boolean hasActiveToken(Long userId) {
+        return userDeviceTokenRepository.existsByUserIdAndPushEnabledTrue(userId);
+    }
+
     private String normalizeDeviceToken(String deviceToken) {
         if (deviceToken == null || deviceToken.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "deviceToken is required");

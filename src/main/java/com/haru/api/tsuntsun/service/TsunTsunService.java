@@ -71,7 +71,7 @@ public class TsunTsunService {
     @Transactional
     public TsunTsunQuizResponse sendTsunTsun(Long senderId, Long receiverId, Long dailyWordItemId) {
         activityTrackingService.touch(senderId);
-        log.info("[tsuntsun/send] request received: senderId={}, receiverId={}, dailyWordItemId={}",
+        log.info("[tsuntsun/send] start senderId={} receiverId={} dailyWordItemId={}",
                 senderId, receiverId, dailyWordItemId);
 
         if (senderId.equals(receiverId)) {
@@ -141,8 +141,8 @@ public class TsunTsunService {
         BuddyRelationship buddyRelationship = buddy.getBuddyRelationship();
         TsunTsun saved = tsunTsunRepository.saveAndFlush(TsunTsun.sent(sender, receiver, word, dailyWordItem, buddyRelationship, today));
 
-        log.info("[tsuntsun/send] send created: tsuntsunId={}, senderId={}, receiverId={}, targetDate={}",
-                saved.getId(), senderId, receiverId, today);
+        log.info("[tsuntsun/send] persisted tsuntsunId={} senderId={} receiverId={} targetDate={} status={}",
+                saved.getId(), senderId, receiverId, saved.getTargetDate(), saved.getStatus());
 
         List<QuizChoiceResponse> choices = tsunTsunQuizService.generateChoices(word);
         Runnable pushTask = () -> pushNotificationService.notifyTsunTsunReceived(
@@ -156,10 +156,14 @@ public class TsunTsunService {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
+                    log.info("[tsuntsun/send] afterCommit senderId={} receiverId={} tsuntsunId={}",
+                            senderId, receiverId, saved.getId());
                     pushTask.run();
                 }
             });
         } else {
+            log.info("[tsuntsun/send] push immediate senderId={} receiverId={} tsuntsunId={} reason=no_transaction_synchronization",
+                    senderId, receiverId, saved.getId());
             pushTask.run();
         }
 
