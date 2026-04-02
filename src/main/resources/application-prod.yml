@@ -7,6 +7,9 @@ app:
   seed:
     users: false
     buddies: false
+  profile-image:
+    storage-path: ${APP_PROFILE_IMAGE_STORAGE_PATH:/app/uploads/profile}
+    url-prefix: ${APP_PROFILE_IMAGE_URL_PREFIX:/uploads/profile}
 
 spring:
   datasource:

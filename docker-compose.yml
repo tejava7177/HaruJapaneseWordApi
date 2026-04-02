@@ -8,6 +8,8 @@ services:
       - .env
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      APP_PROFILE_IMAGE_STORAGE_PATH: ${APP_PROFILE_IMAGE_STORAGE_PATH:-/app/uploads/profile}
+      APP_PROFILE_IMAGE_URL_PREFIX: ${APP_PROFILE_IMAGE_URL_PREFIX:-/uploads/profile}
       APNS_ENABLED: ${APNS_ENABLED:-true}
       APNS_KEY_ID: ${APNS_KEY_ID}
       APNS_TEAM_ID: ${APNS_TEAM_ID}
@@ -18,4 +20,5 @@ services:
       - "8080:8080"
     volumes:
       - ./keys:/app/keys:ro
+      - ${PROFILE_IMAGE_HOST_PATH:-/home/ubuntu/haru-data/profile}:/app/uploads/profile
     restart: unless-stopped

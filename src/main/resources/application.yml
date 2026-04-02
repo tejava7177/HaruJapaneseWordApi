@@ -8,7 +8,7 @@ app:
     users: true
     buddies: false
   profile-image:
-    storage-path: ${user.dir}/uploads/profile
+    storage-path: ${APP_PROFILE_IMAGE_STORAGE_PATH:${user.dir}/uploads/profile}
     url-prefix: /uploads/profile
 
 spring:
