@@ -20,6 +20,8 @@ public interface TsunTsunRepository extends JpaRepository<TsunTsun, Long> {
             TsunTsunStatus status
     );
 
+    long countByReceiverIdAndStatus(Long receiverId, TsunTsunStatus status);
+
     long countByBuddyRelationshipIdAndSenderIdAndReceiverIdAndStatus(
             Long buddyRelationshipId,
             Long senderId,

@@ -1,5 +1,7 @@
 package com.haru.api.push;
 
+import com.haru.api.tsuntsun.domain.TsunTsunStatus;
+import com.haru.api.tsuntsun.repository.TsunTsunRepository;
 import com.haru.api.user.domain.User;
 import com.haru.api.user.repository.UserRepository;
 import com.haru.api.userdevice.service.UserDeviceTokenService;
@@ -15,10 +17,15 @@ import org.springframework.stereotype.Service;
 public class PushNotificationService {
 
     private static final String DEFAULT_TITLE = "하루";
+    private static final String LEARNING_REMINDER_DEFAULT_TITLE = "오늘의 10단어를 확인해보세요";
+    private static final String LEARNING_REMINDER_DEFAULT_BODY = "오늘도 하루 10단어 학습을 시작해볼까요?";
+    private static final String LEARNING_REMINDER_WITH_PETAL_TITLE = "오늘의 10단어와 도착한 꽃잎을 확인해보세요";
+    private static final String LEARNING_REMINDER_WITH_PETAL_BODY = "오늘의 10단어를 보고, 도착한 꽃잎도 함께 확인해보세요.";
 
     private final UserRepository userRepository;
     private final UserDeviceTokenService userDeviceTokenService;
     private final PushSender pushSender;
+    private final TsunTsunRepository tsunTsunRepository;
 
     public void notifyBuddyRequestReceived(Long targetUserId, Long requestId, Long requesterId) {
         sendSafely(
@@ -83,6 +90,25 @@ public class PushNotificationService {
         );
     }
 
+    public void notifyDailyLearningReminder(Long targetUserId) {
+        long pendingPetalCount = tsunTsunRepository.countByReceiverIdAndStatus(targetUserId, TsunTsunStatus.SENT);
+        boolean hasPendingPetal = pendingPetalCount > 0;
+
+        String title = hasPendingPetal ? LEARNING_REMINDER_WITH_PETAL_TITLE : LEARNING_REMINDER_DEFAULT_TITLE;
+        String body = hasPendingPetal ? LEARNING_REMINDER_WITH_PETAL_BODY : LEARNING_REMINDER_DEFAULT_BODY;
+
+        sendSafely(
+                "daily learning reminder",
+                targetUserId,
+                title,
+                body,
+                Map.of(
+                        "type", "DAILY_LEARNING_REMINDER",
+                        "hasPendingPetal", String.valueOf(hasPendingPetal)
+                )
+        );
+    }
+
     private void sendSafely(String notificationType, Long targetUserId, String title, String body, Map<String, String> data) {
         try {
             List<String> deviceTokens = userDeviceTokenService.findActiveTokensByUserId(targetUserId);
@@ -119,6 +145,7 @@ public class PushNotificationService {
             case "buddy request" -> log.info("[Push] notify buddy request targetUserId={} tokenCount={}", targetUserId, tokenCount);
             case "buddy accepted" -> log.info("[Push] notify buddy accepted targetUserId={} tokenCount={}", targetUserId, tokenCount);
             case "tsuntsun" -> log.info("[Push] notify tsuntsun targetUserId={} tokenCount={}", targetUserId, tokenCount);
+            case "daily learning reminder" -> log.info("[Push] notify daily learning reminder targetUserId={} tokenCount={}", targetUserId, tokenCount);
             default -> log.info("[Push] notify type={} targetUserId={} tokenCount={}", notificationType, targetUserId, tokenCount);
         }
     }
