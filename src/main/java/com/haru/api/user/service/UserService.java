@@ -1,6 +1,7 @@
 package com.haru.api.user.service;
 
 import com.haru.api.user.domain.User;
+import com.haru.api.user.dto.ActivePingResponse;
 import com.haru.api.user.dto.UpdateLearningLevelResponse;
 import com.haru.api.user.dto.UpdatePetalNotificationsResponse;
 import com.haru.api.user.dto.UpdateProfileImageResponse;
@@ -9,6 +10,7 @@ import com.haru.api.user.dto.UserBuddyCodeResponse;
 import com.haru.api.user.dto.UserProfileResponse;
 import com.haru.api.user.repository.UserRepository;
 import com.haru.api.word.domain.WordLevel;
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -33,7 +35,6 @@ public class UserService {
 
     @Transactional
     public UpdateLearningLevelResponse updateLearningLevel(Long userId, WordLevel learningLevel) {
-        activityTrackingService.touch(userId);
         User user = findUserOrThrow(userId);
 
         user.changeLearningLevel(learningLevel);
@@ -42,7 +43,6 @@ public class UserService {
 
     @Transactional
     public UpdateRandomMatchingResponse updateRandomMatchingEnabled(Long userId, boolean enabled) {
-        activityTrackingService.touch(userId);
         User user = findUserOrThrow(userId);
 
         user.changeRandomMatchingEnabled(enabled);
@@ -51,7 +51,6 @@ public class UserService {
 
     @Transactional
     public UpdatePetalNotificationsResponse updatePetalNotificationsEnabled(Long userId, boolean enabled) {
-        activityTrackingService.touch(userId);
         User user = findUserOrThrow(userId);
 
         user.changePetalNotificationsEnabled(enabled);
@@ -60,7 +59,6 @@ public class UserService {
 
     @Transactional
     public UserProfileResponse updateUserProfile(Long userId, String nickname, String bio, String instagramId) {
-        activityTrackingService.touch(userId);
         User user = findUserOrThrow(userId);
 
         String normalizedNickname = normalizeNickname(nickname);
@@ -75,7 +73,6 @@ public class UserService {
     public UpdateProfileImageResponse uploadProfileImage(Long userId, MultipartFile file) {
         log.info("[UserProfileImage] upload start userId={}", userId);
 
-        activityTrackingService.touch(userId);
         User user = findUserOrThrow(userId);
 
         String profileImageUrl;
@@ -94,19 +91,23 @@ public class UserService {
     }
 
     public UserBuddyCodeResponse getBuddyCode(Long userId) {
-        activityTrackingService.touch(userId);
         User user = findUserOrThrow(userId);
 
         return UserBuddyCodeResponse.from(user);
     }
 
     public UserProfileResponse getUserProfile(Long userId) {
-        activityTrackingService.touch(userId);
         User user = findUserOrThrow(userId);
 
         UserProfileResponse response = UserProfileResponse.from(user);
         log.info("[UserProfile] response includes profileImageUrl={}", response.profileImageUrl());
         return response;
+    }
+
+    @Transactional
+    public ActivePingResponse pingActive(Long userId) {
+        LocalDateTime lastActiveAt = activityTrackingService.touch(userId);
+        return new ActivePingResponse(userId, lastActiveAt);
     }
 
     private User findUserOrThrow(Long userId) {

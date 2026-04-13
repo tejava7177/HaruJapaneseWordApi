@@ -13,7 +13,6 @@ import com.haru.api.tsuntsun.domain.TsunTsunStatus;
 import com.haru.api.tsuntsun.repository.TsunTsunRepository;
 import com.haru.api.user.domain.User;
 import com.haru.api.user.repository.UserRepository;
-import com.haru.api.user.service.ActivityTrackingService;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -38,11 +37,9 @@ public class BuddyService {
     private final BuddyRequestRepository buddyRequestRepository;
     private final TsunTsunRepository tsunTsunRepository;
     private final UserRepository userRepository;
-    private final ActivityTrackingService activityTrackingService;
     private final Clock clock;
 
     public List<BuddyResponse> getBuddies(Long userId) {
-        activityTrackingService.touch(userId);
         ensureUserExists(userId);
         return buddyRepository.findByUserIdAndStatusOrderByCreatedAtAsc(userId, BuddyStatus.ACTIVE)
                 .stream()
@@ -52,7 +49,6 @@ public class BuddyService {
 
     @Transactional
     public BuddyResponse connectByBuddyCode(Long userId, String buddyCode) {
-        activityTrackingService.touch(userId);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId));
 
@@ -64,7 +60,6 @@ public class BuddyService {
 
     @Transactional
     public BuddyResponse addBuddy(Long userId, Long buddyUserId) {
-        activityTrackingService.touch(userId);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId));
 
@@ -76,7 +71,6 @@ public class BuddyService {
 
     @Transactional
     public DeleteBuddyResponse removeBuddy(Long userId, Long buddyUserId) {
-        activityTrackingService.touch(userId);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId));
         User buddyUser = userRepository.findById(buddyUserId)
@@ -92,7 +86,6 @@ public class BuddyService {
     }
 
     public List<RandomMatchingCandidateResponse> getRandomCandidates(Long userId) {
-        activityTrackingService.touch(userId);
         userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId));
 

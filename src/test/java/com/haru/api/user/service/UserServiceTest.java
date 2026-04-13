@@ -4,8 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.haru.api.user.domain.User;
+import com.haru.api.user.dto.ActivePingResponse;
 import com.haru.api.user.dto.UpdateLearningLevelResponse;
 import com.haru.api.user.dto.UpdatePetalNotificationsResponse;
 import com.haru.api.user.dto.UpdateProfileImageResponse;
@@ -13,6 +16,7 @@ import com.haru.api.user.dto.UserBuddyCodeResponse;
 import com.haru.api.user.dto.UserProfileResponse;
 import com.haru.api.user.repository.UserRepository;
 import com.haru.api.word.domain.WordLevel;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,6 +57,7 @@ class UserServiceTest {
         assertThat(response.learningLevel()).isEqualTo(WordLevel.N2);
         assertThat(response.message()).contains("newly generated daily words");
         assertThat(user.getLearningLevel()).isEqualTo(WordLevel.N2);
+        verifyNoInteractions(activityTrackingService);
     }
 
     @Test
@@ -73,6 +78,7 @@ class UserServiceTest {
 
         assertThat(response.userId()).isEqualTo(1L);
         assertThat(response.buddyCode()).isEqualTo("JUHEUN01");
+        verifyNoInteractions(activityTrackingService);
     }
 
     @Test
@@ -155,6 +161,19 @@ class UserServiceTest {
         assertThat(response.randomMatchingEnabled()).isTrue();
         assertThat(response.petalNotificationsEnabled()).isTrue();
         assertThat(response.profileImageUrl()).isEqualTo("https://cdn.haru.app/profiles/2.png");
+        verifyNoInteractions(activityTrackingService);
+    }
+
+    @Test
+    void pingActive_updatesLastActiveAtExplicitly() {
+        LocalDateTime lastActiveAt = LocalDateTime.of(2026, 4, 13, 9, 0, 0);
+        given(activityTrackingService.touch(2L)).willReturn(lastActiveAt);
+
+        ActivePingResponse response = userService.pingActive(2L);
+
+        assertThat(response.userId()).isEqualTo(2L);
+        assertThat(response.lastActiveAt()).isEqualTo(lastActiveAt);
+        verify(activityTrackingService).touch(2L);
     }
 
     @Test

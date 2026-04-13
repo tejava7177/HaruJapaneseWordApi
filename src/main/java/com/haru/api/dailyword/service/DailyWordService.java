@@ -9,7 +9,6 @@ import com.haru.api.tsuntsun.repository.TsunTsunAnswerRepository;
 import com.haru.api.tsuntsun.repository.TsunTsunRepository;
 import com.haru.api.user.domain.User;
 import com.haru.api.user.repository.UserRepository;
-import com.haru.api.user.service.ActivityTrackingService;
 import com.haru.api.word.domain.Word;
 import com.haru.api.word.domain.WordLevel;
 import com.haru.api.word.repository.WordRepository;
@@ -36,12 +35,10 @@ public class DailyWordService {
     private final DailyWordSetRepository dailyWordSetRepository;
     private final TsunTsunRepository tsunTsunRepository;
     private final TsunTsunAnswerRepository tsunTsunAnswerRepository;
-    private final ActivityTrackingService activityTrackingService;
     private final Clock clock;
 
     @Transactional
     public DailyWordTodayResponse getTodayWords(Long userId) {
-        activityTrackingService.touch(userId);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId));
 
@@ -54,7 +51,6 @@ public class DailyWordService {
 
     @Transactional
     public DevDailyWordRegenerateResponse regenerateTodayWordsForDevelopment(Long userId) {
-        activityTrackingService.touch(userId);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId));
 

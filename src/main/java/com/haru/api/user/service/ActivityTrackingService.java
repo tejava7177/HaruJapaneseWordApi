@@ -19,9 +19,11 @@ public class ActivityTrackingService {
     private final Clock clock;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void touch(Long userId) {
+    public LocalDateTime touch(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found: " + userId));
-        user.updateLastActiveAt(LocalDateTime.now(clock));
+        LocalDateTime now = LocalDateTime.now(clock);
+        user.updateLastActiveAt(now);
+        return now;
     }
 }

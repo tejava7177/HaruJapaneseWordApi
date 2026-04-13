@@ -6,9 +6,11 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.haru.api.user.dto.ActivePingResponse;
 import com.haru.api.user.dto.UpdateLearningLevelResponse;
 import com.haru.api.user.dto.UpdatePetalNotificationsResponse;
 import com.haru.api.user.dto.UpdateProfileImageResponse;
@@ -17,6 +19,7 @@ import com.haru.api.user.dto.UserBuddyCodeResponse;
 import com.haru.api.user.dto.UserProfileResponse;
 import com.haru.api.user.service.UserService;
 import com.haru.api.word.domain.WordLevel;
+import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -102,6 +105,17 @@ class UserControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.userId").value(1))
                 .andExpect(jsonPath("$.buddyCode").value("JUHEUN01"));
+    }
+
+    @Test
+    void pingActive_returnsUpdatedLastActiveAt() throws Exception {
+        ActivePingResponse response = new ActivePingResponse(1L, LocalDateTime.of(2026, 4, 13, 9, 0, 0));
+        given(userService.pingActive(1L)).willReturn(response);
+
+        mockMvc.perform(post("/api/users/1/active-ping"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(1))
+                .andExpect(jsonPath("$.lastActiveAt").value("2026-04-13T09:00:00"));
     }
 
     @Test

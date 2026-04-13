@@ -235,7 +235,6 @@ class BuddyRequestServiceTest {
                 buddyRequestRepository,
                 tsunTsunRepository,
                 userRepository,
-                activityTrackingService,
                 Clock.fixed(Instant.parse("2026-03-27T15:00:00Z"), ZoneId.of("Asia/Seoul"))
         );
         BuddyRequestService acceptService = new BuddyRequestService(

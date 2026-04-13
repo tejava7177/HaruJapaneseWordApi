@@ -1,5 +1,6 @@
 package com.haru.api.user.controller;
 
+import com.haru.api.user.dto.ActivePingResponse;
 import com.haru.api.user.dto.UpdateLearningLevelRequest;
 import com.haru.api.user.dto.UpdateLearningLevelResponse;
 import com.haru.api.user.dto.UpdatePetalNotificationsRequest;
@@ -44,6 +45,12 @@ public class UserController {
     @Operation(summary = "현재 사용자 초대코드 조회")
     public UserBuddyCodeResponse getBuddyCode(@PathVariable Long userId) {
         return userService.getBuddyCode(userId);
+    }
+
+    @PostMapping("/{userId}/active-ping")
+    @Operation(summary = "앱 foreground 진입 시 최근 접속 갱신")
+    public ActivePingResponse pingActive(@PathVariable Long userId) {
+        return userService.pingActive(userId);
     }
 
     @PatchMapping("/{userId}/learning-level")
