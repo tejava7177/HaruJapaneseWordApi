@@ -13,6 +13,8 @@ public interface WordRepository extends JpaRepository<Word, Long> {
 
     List<Word> findByLevelOrderByIdAsc(WordLevel level);
 
+    List<Word> findByLevelAndIdNotOrderByIdAsc(WordLevel level, Long id);
+
     @EntityGraph(attributePaths = "meanings")
     Optional<Word> findWithMeaningsById(Long id);
 }

@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.haru.api.tsuntsun.domain.TsunTsunQuizType;
 import com.haru.api.tsuntsun.domain.TsunTsunStatus;
 import com.haru.api.tsuntsun.dto.QuizChoiceResponse;
 import com.haru.api.tsuntsun.dto.TsunTsunAnswerResponse;
@@ -44,6 +45,7 @@ class TsunTsunControllerTest {
                 1L,
                 2L,
                 10L,
+                TsunTsunQuizType.MEANING,
                 "ああ",
                 "ああ",
                 LocalDate.of(2026, 3, 10),
@@ -60,12 +62,13 @@ class TsunTsunControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tsuntsunId").value(1))
+                .andExpect(jsonPath("$.type").value("MEANING"))
                 .andExpect(jsonPath("$.status").value("SENT"));
     }
 
     @Test
     void answerTsunTsun_returnsAnswerResult() throws Exception {
-        TsunTsunAnswerResponse response = new TsunTsunAnswerResponse(1L, true, 100L, 100L, "인사", 3L, 10L, false);
+        TsunTsunAnswerResponse response = new TsunTsunAnswerResponse(1L, TsunTsunQuizType.MEANING, true, 100L, 100L, "인사", 3L, 10L, false);
         given(tsunTsunService.answerTsunTsun(1L, 100L)).willReturn(response);
 
         mockMvc.perform(post("/api/tsuntsun/answer")
@@ -74,9 +77,10 @@ class TsunTsunControllerTest {
                                 {"tsuntsunId":1,"meaningId":100}
                                 """))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.type").value("MEANING"))
                 .andExpect(jsonPath("$.correct").value(true))
-                .andExpect(jsonPath("$.selectedMeaningId").value(100))
-                .andExpect(jsonPath("$.correctMeaningId").value(100))
+                .andExpect(jsonPath("$.selectedChoiceId").value(100))
+                .andExpect(jsonPath("$.correctChoiceId").value(100))
                 .andExpect(jsonPath("$.correctText").value("인사"))
                 .andExpect(jsonPath("$.pairProgressCount").value(3))
                 .andExpect(jsonPath("$.pairProgressGoal").value(10))
@@ -85,7 +89,7 @@ class TsunTsunControllerTest {
 
     @Test
     void answerTsunTsun_returnsWrongResultWithOkStatus() throws Exception {
-        TsunTsunAnswerResponse response = new TsunTsunAnswerResponse(11L, false, 3222L, 100L, "보통", 10L, 10L, true);
+        TsunTsunAnswerResponse response = new TsunTsunAnswerResponse(11L, TsunTsunQuizType.MEANING, false, 3222L, 100L, "보통", 10L, 10L, true);
         given(tsunTsunService.answerTsunTsun(11L, 3222L)).willReturn(response);
 
         mockMvc.perform(post("/api/tsuntsun/answer")
@@ -95,9 +99,10 @@ class TsunTsunControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tsuntsunId").value(11))
+                .andExpect(jsonPath("$.type").value("MEANING"))
                 .andExpect(jsonPath("$.correct").value(false))
-                .andExpect(jsonPath("$.selectedMeaningId").value(3222))
-                .andExpect(jsonPath("$.correctMeaningId").value(100))
+                .andExpect(jsonPath("$.selectedChoiceId").value(3222))
+                .andExpect(jsonPath("$.correctChoiceId").value(100))
                 .andExpect(jsonPath("$.correctText").value("보통"))
                 .andExpect(jsonPath("$.pairProgressCount").value(10))
                 .andExpect(jsonPath("$.pairProgressGoal").value(10))
@@ -127,6 +132,7 @@ class TsunTsunControllerTest {
                         1L,
                         "김민성",
                         390L,
+                        TsunTsunQuizType.MEANING,
                         "紹介",
                         "しょうかい",
                         LocalDate.of(2026, 3, 12),
@@ -140,7 +146,8 @@ class TsunTsunControllerTest {
                 .andExpect(jsonPath("$.userId").value(2))
                 .andExpect(jsonPath("$.unansweredCount").value(1))
                 .andExpect(jsonPath("$.items[0].senderName").value("김민성"))
-                .andExpect(jsonPath("$.items[0].choices[0].meaningId").value(100));
+                .andExpect(jsonPath("$.items[0].type").value("MEANING"))
+                .andExpect(jsonPath("$.items[0].choices[0].choiceId").value(100));
     }
 
     @Test

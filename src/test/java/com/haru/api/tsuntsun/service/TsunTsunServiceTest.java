@@ -16,6 +16,7 @@ import com.haru.api.dailyword.repository.DailyWordItemRepository;
 import com.haru.api.dailyword.repository.DailyWordSetRepository;
 import com.haru.api.push.PushNotificationService;
 import com.haru.api.tsuntsun.domain.TsunTsun;
+import com.haru.api.tsuntsun.domain.TsunTsunQuizType;
 import com.haru.api.tsuntsun.domain.TsunTsunStatus;
 import com.haru.api.tsuntsun.dto.QuizChoiceResponse;
 import com.haru.api.tsuntsun.dto.TsunTsunAnswerResponse;
@@ -30,6 +31,7 @@ import com.haru.api.word.domain.Meaning;
 import com.haru.api.word.domain.Word;
 import com.haru.api.word.domain.WordLevel;
 import com.haru.api.word.repository.MeaningRepository;
+import com.haru.api.word.repository.WordRepository;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -59,6 +61,7 @@ class TsunTsunServiceTest {
     @Mock private DailyWordItemRepository dailyWordItemRepository;
     @Mock private DailyWordSetRepository dailyWordSetRepository;
     @Mock private MeaningRepository meaningRepository;
+    @Mock private WordRepository wordRepository;
     @Mock private TsunTsunQuizService tsunTsunQuizService;
     @Mock private PushNotificationService pushNotificationService;
     @Mock private ActivityTrackingService activityTrackingService;
@@ -77,6 +80,7 @@ class TsunTsunServiceTest {
                 dailyWordItemRepository,
                 dailyWordSetRepository,
                 meaningRepository,
+                wordRepository,
                 tsunTsunQuizService,
                 pushNotificationService,
                 activityTrackingService,
@@ -173,8 +177,10 @@ class TsunTsunServiceTest {
         Word word = item.getWord();
         TsunTsun saved = testTsunTsun(sender, buddyC, word, item, 30L, today);
         ReflectionTestUtils.setField(saved, "id", 99L);
+        given(tsunTsunQuizService.pickQuizType()).willReturn(TsunTsunQuizType.MEANING);
         given(tsunTsunRepository.saveAndFlush(ArgumentMatchers.any(TsunTsun.class))).willReturn(saved);
-        given(tsunTsunQuizService.generateChoices(word)).willReturn(List.of(new QuizChoiceResponse(1L, "뜻")));
+        given(tsunTsunQuizService.generateQuiz(word, TsunTsunQuizType.MEANING))
+                .willReturn(new TsunTsunGeneratedQuiz(TsunTsunQuizType.MEANING, List.of(new QuizChoiceResponse(1L, "뜻"))));
 
         assertThatThrownBy(() -> tsunTsunService.sendTsunTsun(1L, 2L, 11L))
                 .isInstanceOf(ResponseStatusException.class)
@@ -208,8 +214,9 @@ class TsunTsunServiceTest {
 
         TsunTsunAnswerResponse answer = tsunTsunService.answerTsunTsun(1L, 501L);
         assertThat(answer.correct()).isTrue();
-        assertThat(answer.selectedMeaningId()).isEqualTo(501L);
-        assertThat(answer.correctMeaningId()).isEqualTo(501L);
+        assertThat(answer.type()).isEqualTo(TsunTsunQuizType.MEANING);
+        assertThat(answer.selectedChoiceId()).isEqualTo(501L);
+        assertThat(answer.correctChoiceId()).isEqualTo(501L);
         assertThat(answer.correctText()).isEqualTo("정답");
         assertThat(answer.pairProgressCount()).isEqualTo(0L);
         assertThat(answer.pairProgressGoal()).isEqualTo(10L);
@@ -227,8 +234,10 @@ class TsunTsunServiceTest {
         Word sendWord = item.getWord();
         TsunTsun saved = testTsunTsun(sender, receiver, sendWord, item, 10L, today);
         ReflectionTestUtils.setField(saved, "id", 88L);
+        given(tsunTsunQuizService.pickQuizType()).willReturn(TsunTsunQuizType.MEANING);
         given(tsunTsunRepository.saveAndFlush(ArgumentMatchers.any(TsunTsun.class))).willReturn(saved);
-        given(tsunTsunQuizService.generateChoices(sendWord)).willReturn(List.of(new QuizChoiceResponse(501L, "정답")));
+        given(tsunTsunQuizService.generateQuiz(sendWord, TsunTsunQuizType.MEANING))
+                .willReturn(new TsunTsunGeneratedQuiz(TsunTsunQuizType.MEANING, List.of(new QuizChoiceResponse(501L, "정답"))));
 
         TsunTsunQuizResponse next = tsunTsunService.sendTsunTsun(1L, 2L, 11L);
         assertThat(next.tsuntsunId()).isEqualTo(88L);
@@ -273,8 +282,10 @@ class TsunTsunServiceTest {
 
         TsunTsun saved = testTsunTsun(userB, userA, sendWord, sendItem, 10L, today);
         ReflectionTestUtils.setField(saved, "id", 77L);
+        given(tsunTsunQuizService.pickQuizType()).willReturn(TsunTsunQuizType.MEANING);
         given(tsunTsunRepository.saveAndFlush(ArgumentMatchers.any(TsunTsun.class))).willReturn(saved);
-        given(tsunTsunQuizService.generateChoices(sendWord)).willReturn(List.of(new QuizChoiceResponse(601L, "뜻")));
+        given(tsunTsunQuizService.generateQuiz(sendWord, TsunTsunQuizType.MEANING))
+                .willReturn(new TsunTsunGeneratedQuiz(TsunTsunQuizType.MEANING, List.of(new QuizChoiceResponse(601L, "뜻"))));
 
         TsunTsunQuizResponse response = tsunTsunService.sendTsunTsun(2L, 1L, 12L);
 
@@ -298,9 +309,21 @@ class TsunTsunServiceTest {
             Long relationshipId,
             LocalDate targetDate
     ) {
+        return testTsunTsun(sender, receiver, word, item, relationshipId, targetDate, TsunTsunQuizType.MEANING);
+    }
+
+    private TsunTsun testTsunTsun(
+            User sender,
+            User receiver,
+            Word word,
+            DailyWordItem item,
+            Long relationshipId,
+            LocalDate targetDate,
+            TsunTsunQuizType quizType
+    ) {
         BuddyRelationship relationship = BuddyRelationship.create();
         ReflectionTestUtils.setField(relationship, "id", relationshipId);
-        TsunTsun tsunTsun = TsunTsun.sent(sender, receiver, word, item, relationship, targetDate);
+        TsunTsun tsunTsun = TsunTsun.sent(sender, receiver, word, item, relationship, targetDate, quizType);
         ReflectionTestUtils.setField(tsunTsun, "createdAt", LocalDateTime.of(targetDate, java.time.LocalTime.NOON));
         return tsunTsun;
     }
@@ -334,12 +357,42 @@ class TsunTsunServiceTest {
 
         assertThat(answer.tsuntsunId()).isEqualTo(1L);
         assertThat(answer.correct()).isFalse();
-        assertThat(answer.selectedMeaningId()).isEqualTo(502L);
-        assertThat(answer.correctMeaningId()).isEqualTo(501L);
+        assertThat(answer.selectedChoiceId()).isEqualTo(502L);
+        assertThat(answer.correctChoiceId()).isEqualTo(501L);
         assertThat(answer.correctText()).isEqualTo("정답");
         assertThat(answer.pairProgressCount()).isEqualTo(1L);
         assertThat(answer.pairCompletedToday()).isFalse();
         assertThat(tsun.getStatus()).isEqualTo(TsunTsunStatus.ANSWERED);
+        verify(tsunTsunAnswerRepository).save(ArgumentMatchers.any());
+    }
+
+    @Test
+    void answerTsunTsun_handlesReadingQuizUsingWordIds() {
+        LocalDate today = FIXED_TODAY;
+        User sender = new User(1L, "s", WordLevel.N4, "AAAA1111");
+        User receiver = new User(2L, "r", WordLevel.N4, "BBBB2222");
+
+        Word word = new Word("花", "はな", WordLevel.N4);
+        ReflectionTestUtils.setField(word, "id", 100L);
+
+        DailyWordItem item = mock(DailyWordItem.class);
+        TsunTsun tsun = testTsunTsun(sender, receiver, word, item, 10L, today, TsunTsunQuizType.READING);
+
+        Word wrongWord = new Word("鼻", "はね", WordLevel.N4);
+        ReflectionTestUtils.setField(wrongWord, "id", 200L);
+
+        given(tsunTsunRepository.findWithWordById(1L)).willReturn(Optional.of(tsun));
+        given(wordRepository.findById(200L)).willReturn(Optional.of(wrongWord));
+        given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDateAndStatus(1L, 2L, today, TsunTsunStatus.ANSWERED)).willReturn(2L);
+        given(tsunTsunRepository.countBySenderIdAndReceiverIdAndTargetDateAndStatus(2L, 1L, today, TsunTsunStatus.ANSWERED)).willReturn(1L);
+
+        TsunTsunAnswerResponse answer = tsunTsunService.answerTsunTsun(1L, 200L);
+
+        assertThat(answer.type()).isEqualTo(TsunTsunQuizType.READING);
+        assertThat(answer.correct()).isFalse();
+        assertThat(answer.selectedChoiceId()).isEqualTo(200L);
+        assertThat(answer.correctChoiceId()).isEqualTo(100L);
+        assertThat(answer.correctText()).isEqualTo("はな");
         verify(tsunTsunAnswerRepository).save(ArgumentMatchers.any());
     }
 
@@ -366,8 +419,8 @@ class TsunTsunServiceTest {
         TsunTsunAnswerResponse answer = tsunTsunService.answerTsunTsun(1L, -1L);
 
         assertThat(answer.correct()).isFalse();
-        assertThat(answer.selectedMeaningId()).isEqualTo(-1L);
-        assertThat(answer.correctMeaningId()).isEqualTo(501L);
+        assertThat(answer.selectedChoiceId()).isEqualTo(-1L);
+        assertThat(answer.correctChoiceId()).isEqualTo(501L);
         assertThat(answer.correctText()).isEqualTo("정답");
         assertThat(answer.pairProgressCount()).isEqualTo(10L);
         assertThat(answer.pairCompletedToday()).isTrue();
@@ -419,8 +472,11 @@ class TsunTsunServiceTest {
         ReflectionTestUtils.setField(tsunTsun, "id", 11L);
         given(tsunTsunRepository.findByReceiverIdAndTargetDateAndStatusOrderByCreatedAtDesc(2L, today, TsunTsunStatus.SENT))
                 .willReturn(List.of(tsunTsun));
-        given(tsunTsunQuizService.generateChoices(word))
-                .willReturn(List.of(new QuizChoiceResponse(100L, "소개"), new QuizChoiceResponse(-1L, "모르겠어요")));
+        given(tsunTsunQuizService.generateQuiz(word, TsunTsunQuizType.MEANING))
+                .willReturn(new TsunTsunGeneratedQuiz(
+                        TsunTsunQuizType.MEANING,
+                        List.of(new QuizChoiceResponse(100L, "소개"), new QuizChoiceResponse(-1L, "모르겠어요"))
+                ));
 
         TsunTsunInboxResponse response = tsunTsunService.getInbox(2L);
 
@@ -612,6 +668,7 @@ class TsunTsunServiceTest {
                 dailyWordItemRepository,
                 dailyWordSetRepository,
                 meaningRepository,
+                wordRepository,
                 tsunTsunQuizService,
                 pushNotificationService,
                 activityTrackingService,
@@ -639,6 +696,7 @@ class TsunTsunServiceTest {
                 dailyWordItemRepository,
                 dailyWordSetRepository,
                 meaningRepository,
+                wordRepository,
                 tsunTsunQuizService,
                 pushNotificationService,
                 activityTrackingService,

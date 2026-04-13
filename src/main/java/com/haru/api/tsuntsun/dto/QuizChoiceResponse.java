@@ -1,7 +1,7 @@
 package com.haru.api.tsuntsun.dto;
 
 public record QuizChoiceResponse(
-        Long meaningId,
+        Long choiceId,
         String text
 ) {
 }

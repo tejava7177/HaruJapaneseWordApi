@@ -1,6 +1,7 @@
 package com.haru.api.tsuntsun.dto;
 
 import com.haru.api.tsuntsun.domain.TsunTsun;
+import com.haru.api.tsuntsun.domain.TsunTsunQuizType;
 import com.haru.api.tsuntsun.domain.TsunTsunStatus;
 import java.time.LocalDate;
 import java.util.List;
@@ -10,6 +11,7 @@ public record TsunTsunQuizResponse(
         Long senderId,
         Long receiverId,
         Long wordId,
+        TsunTsunQuizType type,
         String expression,
         String reading,
         LocalDate targetDate,
@@ -22,6 +24,7 @@ public record TsunTsunQuizResponse(
                 tsuntsun.getSender().getId(),
                 tsuntsun.getReceiver().getId(),
                 tsuntsun.getWord().getId(),
+                tsuntsun.getQuizType(),
                 tsuntsun.getWord().getExpression(),
                 tsuntsun.getWord().getReading(),
                 tsuntsun.getTargetDate(),

@@ -1,9 +1,10 @@
 package com.haru.api.tsuntsun.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.NotNull;
 
 public record AnswerTsunTsunRequest(
         @NotNull Long tsuntsunId,
-        @NotNull Long meaningId
+        @JsonAlias("meaningId") @NotNull Long choiceId
 ) {
 }

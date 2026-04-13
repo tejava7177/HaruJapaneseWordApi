@@ -60,6 +60,10 @@ public class TsunTsun {
     @Column(nullable = false)
     private TsunTsunStatus status;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "quiz_type", nullable = false)
+    private TsunTsunQuizType quizType;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -70,7 +74,8 @@ public class TsunTsun {
             Word word,
             DailyWordItem dailyWordItem,
             BuddyRelationship buddyRelationship,
-            LocalDate targetDate
+            LocalDate targetDate,
+            TsunTsunQuizType quizType
     ) {
         this.sender = sender;
         this.receiver = receiver;
@@ -79,6 +84,7 @@ public class TsunTsun {
         this.buddyRelationship = buddyRelationship;
         this.targetDate = targetDate;
         this.status = TsunTsunStatus.SENT;
+        this.quizType = quizType;
     }
 
     public static TsunTsun sent(
@@ -87,10 +93,12 @@ public class TsunTsun {
             Word word,
             DailyWordItem dailyWordItem,
             BuddyRelationship buddyRelationship,
-            LocalDate targetDate
+            LocalDate targetDate,
+            TsunTsunQuizType quizType
     ) {
         Objects.requireNonNull(buddyRelationship, "buddyRelationship must not be null");
-        return new TsunTsun(sender, receiver, word, dailyWordItem, buddyRelationship, targetDate);
+        Objects.requireNonNull(quizType, "quizType must not be null");
+        return new TsunTsun(sender, receiver, word, dailyWordItem, buddyRelationship, targetDate, quizType);
     }
 
     public void markAnswered() {

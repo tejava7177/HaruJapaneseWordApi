@@ -11,6 +11,7 @@ import com.haru.api.dailyword.repository.DailyWordSetRepository;
 import com.haru.api.push.PushNotificationService;
 import com.haru.api.tsuntsun.domain.TsunTsun;
 import com.haru.api.tsuntsun.domain.TsunTsunAnswer;
+import com.haru.api.tsuntsun.domain.TsunTsunQuizType;
 import com.haru.api.tsuntsun.domain.TsunTsunStatus;
 import com.haru.api.tsuntsun.dto.QuizChoiceResponse;
 import com.haru.api.tsuntsun.dto.TsunTsunAnswerResponse;
@@ -29,6 +30,7 @@ import com.haru.api.user.service.ActivityTrackingService;
 import com.haru.api.word.domain.Meaning;
 import com.haru.api.word.domain.Word;
 import com.haru.api.word.repository.MeaningRepository;
+import com.haru.api.word.repository.WordRepository;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -63,6 +65,7 @@ public class TsunTsunService {
     private final DailyWordItemRepository dailyWordItemRepository;
     private final DailyWordSetRepository dailyWordSetRepository;
     private final MeaningRepository meaningRepository;
+    private final WordRepository wordRepository;
     private final TsunTsunQuizService tsunTsunQuizService;
     private final PushNotificationService pushNotificationService;
     private final ActivityTrackingService activityTrackingService;
@@ -138,13 +141,16 @@ public class TsunTsunService {
         }
 
         Word word = dailyWordItem.getWord();
+        TsunTsunQuizType quizType = tsunTsunQuizService.pickQuizType();
         BuddyRelationship buddyRelationship = buddy.getBuddyRelationship();
-        TsunTsun saved = tsunTsunRepository.saveAndFlush(TsunTsun.sent(sender, receiver, word, dailyWordItem, buddyRelationship, today));
+        TsunTsun saved = tsunTsunRepository.saveAndFlush(
+                TsunTsun.sent(sender, receiver, word, dailyWordItem, buddyRelationship, today, quizType)
+        );
 
         log.info("[tsuntsun/send] persisted tsuntsunId={} senderId={} receiverId={} targetDate={} status={}",
                 saved.getId(), senderId, receiverId, saved.getTargetDate(), saved.getStatus());
 
-        List<QuizChoiceResponse> choices = tsunTsunQuizService.generateChoices(word);
+        TsunTsunGeneratedQuiz quiz = tsunTsunQuizService.generateQuiz(word, quizType);
         Runnable pushTask = () -> pushNotificationService.notifyTsunTsunReceived(
                 receiverId,
                 saved.getId(),
@@ -167,11 +173,11 @@ public class TsunTsunService {
             pushTask.run();
         }
 
-        return TsunTsunQuizResponse.from(saved, choices);
+        return TsunTsunQuizResponse.from(saved, quiz.choices());
     }
 
     @Transactional
-    public TsunTsunAnswerResponse answerTsunTsun(Long tsuntsunId, Long meaningId) {
+    public TsunTsunAnswerResponse answerTsunTsun(Long tsuntsunId, Long choiceId) {
         TsunTsun tsunTsun = tsunTsunRepository.findWithWordById(tsuntsunId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "TsunTsun not found: " + tsuntsunId));
         activityTrackingService.touch(tsunTsun.getReceiver().getId());
@@ -180,17 +186,13 @@ public class TsunTsunService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미 답변한 츤츤입니다.");
         }
 
-        List<Meaning> meanings = meaningRepository.findByWordIdOrderByOrdAsc(tsunTsun.getWord().getId());
-        if (meanings.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Word has no meaning: " + tsunTsun.getWord().getId());
-        }
-
-        Meaning correctMeaning = meanings.get(0);
-        boolean isCorrect = correctMeaning.getId().equals(meaningId);
-        String selectedMeaningText = resolveSelectedMeaningText(meaningId);
+        Long correctChoiceId = resolveCorrectChoiceId(tsunTsun);
+        String correctText = resolveCorrectText(tsunTsun);
+        boolean isCorrect = correctChoiceId.equals(choiceId);
+        String selectedChoiceText = resolveSelectedChoiceText(tsunTsun.getQuizType(), choiceId);
 
         tsunTsun.markAnswered();
-        tsunTsunAnswerRepository.save(TsunTsunAnswer.of(tsunTsun, selectedMeaningText, isCorrect));
+        tsunTsunAnswerRepository.save(TsunTsunAnswer.of(tsunTsun, selectedChoiceText, isCorrect));
         long pairProgressCount = getPairProgressCount(
                 tsunTsun.getSender().getId(),
                 tsunTsun.getReceiver().getId(),
@@ -208,22 +210,53 @@ public class TsunTsunService {
 
         return new TsunTsunAnswerResponse(
                 tsuntsunId,
+                tsunTsun.getQuizType(),
                 isCorrect,
-                meaningId,
-                correctMeaning.getId(),
-                correctMeaning.getText(),
+                choiceId,
+                correctChoiceId,
+                correctText,
                 pairProgressCount,
                 PAIR_PROGRESS_GOAL,
                 pairCompletedToday
         );
     }
 
-    private String resolveSelectedMeaningText(Long meaningId) {
-        if (meaningId.equals(GIVE_UP_CHOICE_ID)) {
+    private Long resolveCorrectChoiceId(TsunTsun tsunTsun) {
+        if (tsunTsun.getQuizType() == TsunTsunQuizType.READING) {
+            return tsunTsun.getWord().getId();
+        }
+
+        List<Meaning> meanings = meaningRepository.findByWordIdOrderByOrdAsc(tsunTsun.getWord().getId());
+        if (meanings.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Word has no meaning: " + tsunTsun.getWord().getId());
+        }
+        return meanings.get(0).getId();
+    }
+
+    private String resolveCorrectText(TsunTsun tsunTsun) {
+        if (tsunTsun.getQuizType() == TsunTsunQuizType.READING) {
+            return tsunTsun.getWord().getReading();
+        }
+
+        List<Meaning> meanings = meaningRepository.findByWordIdOrderByOrdAsc(tsunTsun.getWord().getId());
+        if (meanings.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Word has no meaning: " + tsunTsun.getWord().getId());
+        }
+        return meanings.get(0).getText();
+    }
+
+    private String resolveSelectedChoiceText(TsunTsunQuizType quizType, Long choiceId) {
+        if (choiceId.equals(GIVE_UP_CHOICE_ID)) {
             return GIVE_UP_TEXT;
         }
 
-        return meaningRepository.findById(meaningId)
+        if (quizType == TsunTsunQuizType.READING) {
+            return wordRepository.findById(choiceId)
+                    .map(Word::getReading)
+                    .orElse("알 수 없는 읽기");
+        }
+
+        return meaningRepository.findById(choiceId)
                 .map(Meaning::getText)
                 .orElse(UNKNOWN_MEANING_TEXT);
     }
@@ -241,7 +274,7 @@ public class TsunTsunService {
                 .stream()
                 .map(tsunTsun -> TsunTsunInboxItemResponse.from(
                         tsunTsun,
-                        tsunTsunQuizService.generateChoices(tsunTsun.getWord())
+                        tsunTsunQuizService.generateQuiz(tsunTsun.getWord(), tsunTsun.getQuizType()).choices()
                 ))
                 .toList();
 

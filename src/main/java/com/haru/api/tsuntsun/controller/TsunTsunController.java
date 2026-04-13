@@ -30,7 +30,7 @@ public class TsunTsunController {
 
     @PostMapping("/answer")
     public TsunTsunAnswerResponse answerTsunTsun(@Valid @RequestBody AnswerTsunTsunRequest request) {
-        return tsunTsunService.answerTsunTsun(request.tsuntsunId(), request.meaningId());
+        return tsunTsunService.answerTsunTsun(request.tsuntsunId(), request.choiceId());
     }
 
     @GetMapping("/inbox")

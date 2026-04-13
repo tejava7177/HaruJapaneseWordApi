@@ -11,6 +11,7 @@ import com.haru.api.dailyword.domain.DailyWordSet;
 import com.haru.api.dailyword.dto.DevDailyWordRegenerateResponse;
 import com.haru.api.dailyword.repository.DailyWordSetRepository;
 import com.haru.api.tsuntsun.domain.TsunTsun;
+import com.haru.api.tsuntsun.domain.TsunTsunQuizType;
 import com.haru.api.tsuntsun.repository.TsunTsunAnswerRepository;
 import com.haru.api.tsuntsun.repository.TsunTsunRepository;
 import com.haru.api.user.domain.User;
@@ -85,7 +86,7 @@ class DailyWordServiceTest {
         BuddyRelationship relationship = BuddyRelationship.create();
         ReflectionTestUtils.setField(relationship, "id", 77L);
         TsunTsun tsunTsun = TsunTsun.sent(user, new User(1L, "juheun", WordLevel.N4, "JUHEUN01"),
-                existingSet.getItems().get(0).getWord(), existingSet.getItems().get(0), relationship, FIXED_TODAY);
+                existingSet.getItems().get(0).getWord(), existingSet.getItems().get(0), relationship, FIXED_TODAY, TsunTsunQuizType.MEANING);
         ReflectionTestUtils.setField(tsunTsun, "id", 1001L);
 
         given(userRepository.findById(4L)).willReturn(Optional.of(user));
