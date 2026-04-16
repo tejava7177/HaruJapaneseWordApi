@@ -159,4 +159,20 @@ class PushNotificationServiceTest {
                 Map.of("type", "DAILY_LEARNING_REMINDER", "hasPendingPetal", "true")
         );
     }
+
+    @Test
+    void notifyPetalPendingReminder_sendsReminderCopy() {
+        PushNotificationService service = new PushNotificationService(userRepository, userDeviceTokenService, pushSender, tsunTsunRepository);
+        User receiver = new User(2L, "receiver", WordLevel.N4, "BBBB2222", null, null, null, false, true);
+        given(userDeviceTokenService.findActiveTokensByUserId(2L)).willReturn(List.of("token-1"));
+
+        service.notifyPetalPendingReminder(receiver);
+
+        verify(pushSender).send(
+                List.of("token-1"),
+                "🌸 꽃잎이 기다리고 있어요",
+                "도착한 꽃잎에 답하고 이어서 보내볼까요?",
+                Map.of("type", "PETAL_PENDING_REMINDER")
+        );
+    }
 }

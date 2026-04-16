@@ -2,6 +2,7 @@ package com.haru.api.tsuntsun.repository;
 
 import com.haru.api.tsuntsun.domain.TsunTsun;
 import com.haru.api.tsuntsun.domain.TsunTsunStatus;
+import com.haru.api.user.domain.User;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -21,6 +22,14 @@ public interface TsunTsunRepository extends JpaRepository<TsunTsun, Long> {
     );
 
     long countByReceiverIdAndStatus(Long receiverId, TsunTsunStatus status);
+
+    @Query("""
+            select distinct t.receiver
+            from TsunTsun t
+            where t.status = :status
+            order by t.receiver.id asc
+            """)
+    List<User> findDistinctReceiversByStatus(TsunTsunStatus status);
 
     long countByBuddyRelationshipIdAndSenderIdAndReceiverIdAndStatus(
             Long buddyRelationshipId,

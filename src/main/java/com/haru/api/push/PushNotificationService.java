@@ -21,6 +21,8 @@ public class PushNotificationService {
     private static final String LEARNING_REMINDER_DEFAULT_BODY = "오늘도 하루 10단어 학습을 시작해볼까요?";
     private static final String LEARNING_REMINDER_WITH_PETAL_TITLE = "오늘의 10단어와 도착한 꽃잎을 확인해보세요";
     private static final String LEARNING_REMINDER_WITH_PETAL_BODY = "오늘의 10단어를 보고, 도착한 꽃잎도 함께 확인해보세요.";
+    private static final String PETAL_PENDING_REMINDER_TITLE = "🌸 꽃잎이 기다리고 있어요";
+    private static final String PETAL_PENDING_REMINDER_BODY = "도착한 꽃잎에 답하고 이어서 보내볼까요?";
 
     private final UserRepository userRepository;
     private final UserDeviceTokenService userDeviceTokenService;
@@ -29,11 +31,11 @@ public class PushNotificationService {
 
     public void notifyBuddyRequestReceived(Long targetUserId, Long requestId, Long requesterId) {
         sendSafely(
-                "buddy request",
+                PushNotificationType.BUDDY_REQUEST_RECEIVED,
                 targetUserId,
                 "새로운 버디 신청이 도착했어요",
                 Map.of(
-                        "type", "BUDDY_REQUEST_RECEIVED",
+                        "type", PushNotificationType.BUDDY_REQUEST_RECEIVED.name(),
                         "requestId", String.valueOf(requestId),
                         "requesterId", String.valueOf(requesterId)
                 )
@@ -42,11 +44,11 @@ public class PushNotificationService {
 
     public void notifyBuddyAccepted(Long targetUserId, Long requestId, Long buddyUserId) {
         sendSafely(
-                "buddy accepted",
+                PushNotificationType.BUDDY_ACCEPTED,
                 targetUserId,
                 "버디 요청이 수락됐어요",
                 Map.of(
-                        "type", "BUDDY_ACCEPTED",
+                        "type", PushNotificationType.BUDDY_ACCEPTED.name(),
                         "requestId", String.valueOf(requestId),
                         "buddyUserId", String.valueOf(buddyUserId)
                 )
@@ -78,15 +80,25 @@ public class PushNotificationService {
         }
 
         sendSafely(
-                "tsuntsun",
+                PushNotificationType.PETAL_RECEIVED,
                 targetUserId,
                 "꽃잎이 도착했어요",
                 senderName + "님이 꽃잎을 날렸어요",
                 Map.of(
-                        "type", "PETAL_RECEIVED",
+                        "type", PushNotificationType.PETAL_RECEIVED.name(),
                         "tsunTsunId", String.valueOf(tsunTsunId),
                         "senderUserId", String.valueOf(senderUserId)
                 )
+        );
+    }
+
+    public void notifyPetalPendingReminder(User receiver) {
+        sendSafely(
+                PushNotificationType.PETAL_PENDING_REMINDER,
+                receiver.getId(),
+                PETAL_PENDING_REMINDER_TITLE,
+                PETAL_PENDING_REMINDER_BODY,
+                Map.of("type", PushNotificationType.PETAL_PENDING_REMINDER.name())
         );
     }
 
@@ -98,18 +110,18 @@ public class PushNotificationService {
         String body = hasPendingPetal ? LEARNING_REMINDER_WITH_PETAL_BODY : LEARNING_REMINDER_DEFAULT_BODY;
 
         sendSafely(
-                "daily learning reminder",
+                PushNotificationType.DAILY_LEARNING_REMINDER,
                 targetUserId,
                 title,
                 body,
                 Map.of(
-                        "type", "DAILY_LEARNING_REMINDER",
+                        "type", PushNotificationType.DAILY_LEARNING_REMINDER.name(),
                         "hasPendingPetal", String.valueOf(hasPendingPetal)
                 )
         );
     }
 
-    private void sendSafely(String notificationType, Long targetUserId, String title, String body, Map<String, String> data) {
+    private void sendSafely(PushNotificationType notificationType, Long targetUserId, String title, String body, Map<String, String> data) {
         try {
             List<String> deviceTokens = userDeviceTokenService.findActiveTokensByUserId(targetUserId);
             logByType(notificationType, targetUserId, deviceTokens.size());
@@ -132,21 +144,22 @@ public class PushNotificationService {
                     notificationType, targetUserId, deviceTokens.size());
         } catch (RuntimeException exception) {
             log.warn("[Push] send failed type={} receiverId={} reason=sender_exception message={}",
-                    notificationType, targetUserId, exception.getMessage(), exception);
+                    notificationType.name(), targetUserId, exception.getMessage(), exception);
         }
     }
 
-    private void sendSafely(String notificationType, Long targetUserId, String body, Map<String, String> data) {
+    private void sendSafely(PushNotificationType notificationType, Long targetUserId, String body, Map<String, String> data) {
         sendSafely(notificationType, targetUserId, DEFAULT_TITLE, body, data);
     }
 
-    private void logByType(String notificationType, Long targetUserId, int tokenCount) {
+    private void logByType(PushNotificationType notificationType, Long targetUserId, int tokenCount) {
         switch (notificationType) {
-            case "buddy request" -> log.info("[Push] notify buddy request targetUserId={} tokenCount={}", targetUserId, tokenCount);
-            case "buddy accepted" -> log.info("[Push] notify buddy accepted targetUserId={} tokenCount={}", targetUserId, tokenCount);
-            case "tsuntsun" -> log.info("[Push] notify tsuntsun targetUserId={} tokenCount={}", targetUserId, tokenCount);
-            case "daily learning reminder" -> log.info("[Push] notify daily learning reminder targetUserId={} tokenCount={}", targetUserId, tokenCount);
-            default -> log.info("[Push] notify type={} targetUserId={} tokenCount={}", notificationType, targetUserId, tokenCount);
+            case BUDDY_REQUEST_RECEIVED -> log.info("[Push] notify buddy request targetUserId={} tokenCount={}", targetUserId, tokenCount);
+            case BUDDY_ACCEPTED -> log.info("[Push] notify buddy accepted targetUserId={} tokenCount={}", targetUserId, tokenCount);
+            case PETAL_RECEIVED -> log.info("[Push] notify tsuntsun targetUserId={} tokenCount={}", targetUserId, tokenCount);
+            case DAILY_LEARNING_REMINDER -> log.info("[Push] notify daily learning reminder targetUserId={} tokenCount={}", targetUserId, tokenCount);
+            case PETAL_PENDING_REMINDER -> log.info("[Push] notify petal pending reminder targetUserId={} tokenCount={}", targetUserId, tokenCount);
+            default -> log.info("[Push] notify type={} targetUserId={} tokenCount={}", notificationType.name(), targetUserId, tokenCount);
         }
     }
 }
